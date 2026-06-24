@@ -53,6 +53,10 @@ const userSchema = new mongoose.Schema({
   zip_code: {
     type: String,
     required: true
+  },
+  profile_pic: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true,

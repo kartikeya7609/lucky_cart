@@ -36,6 +36,7 @@ const Profile = () => {
     state: '',
     zip_code: ''
   });
+  const [profilePicFile, setProfilePicFile] = useState(null);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   useEffect(() => {
@@ -125,9 +126,18 @@ const Profile = () => {
     e.preventDefault();
     setIsUpdatingProfile(true);
     try {
-      const res = await api.put('/auth/me', editForm, token);
+      let res;
+      if (profilePicFile) {
+        const formData = new FormData();
+        Object.keys(editForm).forEach(key => formData.append(key, editForm[key]));
+        formData.append('profile_pic', profilePicFile);
+        res = await api.put('/auth/me', formData, token, true);
+      } else {
+        res = await api.put('/auth/me', editForm, token);
+      }
       addToast(res.message || 'Profile updated successfully', 'success');
       setShowEditProfileModal(false);
+      setProfilePicFile(null);
       // We force a page reload to update the context, or we could update the AuthContext state directly if the context exposes an update method.
       // For simplicity, reload to fetch updated user details.
       window.location.reload();
@@ -153,7 +163,7 @@ const Profile = () => {
   }
 
   // Set default profile avatar URL
-  const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'User'}`;
+  const avatarUrl = user?.profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'User'}`;
 
   return (
     <div className="min-h-screen bg-[#0F1115] text-white overflow-x-hidden">
@@ -624,6 +634,15 @@ const Profile = () => {
 
             <div className="p-6">
               <form onSubmit={handleUpdateProfile} className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-[8px] font-black text-gray-600 uppercase mb-2">Profile Picture</label>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => setProfilePicFile(e.target.files[0])}
+                    className="w-full bg-white/5 border border-white/10 px-4 py-3 text-xs focus:outline-none focus:border-blue-500 transition-all text-gray-400 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                </div>
                 <div className="col-span-2">
                   <label className="block text-[8px] font-black text-gray-600 uppercase mb-2">Full Name</label>
                   <input 

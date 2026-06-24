@@ -11,8 +11,8 @@ const QUICK_ACCOUNTS = [
 
 const colorMap = {
   emerald: 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20',
-  amber:   'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20',
-  blue:    'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20',
+  amber: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20',
+  blue: 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20',
 };
 
 const Login = () => {
@@ -84,7 +84,7 @@ const Login = () => {
                   required
                   autoComplete="username"
                   className="w-full px-4 py-3.5 bg-[#0F1115] border border-white/10 rounded-xl text-white placeholder-gray-700 focus:outline-none focus:border-white/30 focus:bg-black/40 transition-all duration-200 text-sm"
-                  placeholder="consumer1  or  kartikeyakotha6@gmail.com"
+                  placeholder="your_username@gmail.com"
                   value={username}
                   onChange={(e) => { setUsername(e.target.value); setError(''); }}
                 />

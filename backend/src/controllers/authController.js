@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { User, Wishlist } from '../models/index.js';
+import cloudinary from '../config/cloudinary.js';
 
 // Helper to generate JWT tokens
 const generateTokens = (userId) => {
@@ -184,7 +185,8 @@ export const loginUser = async (req, res) => {
         role: user.role,
         budget: user.budget,
         full_name: user.full_name,
-        prettier_budget: user.prettier_budget
+        prettier_budget: user.prettier_budget,
+        profile_pic: user.profile_pic
       },
       accessToken,
       refreshToken
@@ -281,7 +283,8 @@ export const getMe = async (req, res) => {
       city: user.city,
       state: user.state,
       zip_code: user.zip_code,
-      prettier_budget: user.prettier_budget
+      prettier_budget: user.prettier_budget,
+      profile_pic: user.profile_pic
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error fetching user' });
@@ -308,6 +311,18 @@ export const updateMe = async (req, res) => {
     if (state !== undefined) user.state = state;
     if (zip_code !== undefined) user.zip_code = zip_code;
 
+    if (req.file) {
+      // Convert buffer to base64 for Cloudinary
+      const b64 = Buffer.from(req.file.buffer).toString('base64');
+      const dataURI = 'data:' + req.file.mimetype + ';base64,' + b64;
+      
+      const uploadRes = await cloudinary.uploader.upload(dataURI, {
+        folder: 'lucky_cart/profiles',
+        resource_type: 'auto'
+      });
+      user.profile_pic = uploadRes.secure_url;
+    }
+
     await user.save();
 
     res.status(200).json({
@@ -324,7 +339,8 @@ export const updateMe = async (req, res) => {
         city: user.city,
         state: user.state,
         zip_code: user.zip_code,
-        prettier_budget: user.prettier_budget
+        prettier_budget: user.prettier_budget,
+        profile_pic: user.profile_pic
       }
     });
   } catch (error) {
