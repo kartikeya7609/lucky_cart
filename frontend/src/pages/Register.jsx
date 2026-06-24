@@ -5,6 +5,9 @@ import { api } from '../utils/api';
 import emailjs from '@emailjs/browser';
 import { UserPlus, ChevronRight, ChevronLeft, ShieldCheck, Mail } from 'lucide-react';
 
+// Initialize EmailJS at module level (required for v4+ to properly handle CORS preflight)
+emailjs.init({ publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY });
+
 const Register = () => {
   const { register, addToast } = useAuth();
   const navigate = useNavigate();
@@ -44,8 +47,15 @@ const Register = () => {
     setShowResend(false);
     setRemainingTime(300);
 
-    emailjs.init({ publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY });
-    emailjs.send(import.meta.env.VITE_EMAILJS_SERVICE_ID, import.meta.env.VITE_EMAILJS_TEMPLATE_ID, {
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+
+    if (!serviceId || !templateId) {
+      setOtpStatus({ message: 'Email service not configured. Contact support.', type: 'danger' });
+      return;
+    }
+
+    emailjs.send(serviceId, templateId, {
       to_email: email,
       to_name: fullName || 'User',
       otp_code: otp,
