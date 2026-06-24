@@ -10,3 +10,7 @@ build/
 coverage/
 .next/
 out/
+mongodb_data/
+dev-dist/
+
+
