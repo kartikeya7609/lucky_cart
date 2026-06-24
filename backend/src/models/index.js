@@ -10,6 +10,10 @@ import Coupon from './Coupon.js';
 import Notification from './Notification.js';
 import ViewedItem from './ViewedItem.js';
 import Review from './Review.js';
+import Follow from './Follow.js';
+import Group from './Group.js';
+import ProductInteraction from './ProductInteraction.js';
+import Message from './Message.js';
 
 export {
   User,
@@ -23,5 +27,9 @@ export {
   Coupon,
   Notification,
   ViewedItem,
-  Review
+  Review,
+  Follow,
+  Group,
+  ProductInteraction,
+  Message
 };

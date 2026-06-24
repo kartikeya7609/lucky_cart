@@ -9,7 +9,8 @@ import {
   Star, Activity, Settings, LogOut, Calendar, Download, IndianRupee,
   TrendingUp, TrendingDown, RefreshCw, Search, Eye, Plus, UserPlus,
   CornerUpLeft, Truck, Check, Trash, Edit, X,
-  ChevronLeft, ChevronRight, Table, LayoutGrid, Upload, Trash2, Menu
+  ChevronLeft, ChevronRight, Table, LayoutGrid, Upload, Trash2, Menu,
+  Share2, MessageSquare, Heart
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -46,11 +47,31 @@ const AdminDashboard = () => {
   const [reviewQuery, setReviewQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Social Circle / Graph Algorithm States
+  const [graphNodes, setGraphNodes] = useState([]);
+  const [graphLinks, setGraphLinks] = useState([]);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [draggedNode, setDraggedNode] = useState(null);
+  const [algoType, setAlgoType] = useState('pagerank'); // pagerank, pathfinder, centrality
+  const [pathStart, setPathStart] = useState('');
+  const [pathEnd, setPathEnd] = useState('');
+  const [computedPath, setComputedPath] = useState([]);
+  const [pageRankScores, setPageRankScores] = useState({});
+  const [centralityScores, setCentralityScores] = useState({});
+  const [newEdgeSource, setNewEdgeSource] = useState('');
+  const [newEdgeTarget, setNewEdgeTarget] = useState('');
+  const [newEdgeType, setNewEdgeType] = useState('follow');
+  const [socialLogs, setSocialLogs] = useState([
+    { id: 1, text: 'System initialized with mock social relationships.', time: 'Just now' }
+  ]);
+
   const revChartRef = useRef(null);
   const donutChartRef = useRef(null);
   const trendChartRef = useRef(null);
   const catChartRef = useRef(null);
   const payChartRef = useRef(null);
+  const canvasRef = useRef(null);
 
   const revChartInstance = useRef(null);
   const donutChartInstance = useRef(null);
@@ -85,6 +106,429 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchData();
   }, [token]);
+
+  // Social Graph Initialization Effect
+  useEffect(() => {
+    if (users.length > 0 && graphNodes.length === 0) {
+      const nodes = users.map((u, i) => ({
+        id: u._id || u.id || `user_${i}`,
+        name: u.full_name || u.username,
+        username: u.username,
+        role: u.role || 'consumer',
+        x: 180 + Math.cos((i / users.length) * 2 * Math.PI) * 140 + Math.random() * 20,
+        y: 180 + Math.sin((i / users.length) * 2 * Math.PI) * 140 + Math.random() * 20,
+        vx: 0,
+        vy: 0
+      }));
+
+      // Generate random connections to make the graph look interesting
+      const links = [];
+      const relationTypes = ['follow', 'chat'];
+      for (let i = 0; i < nodes.length; i++) {
+        const numConnections = Math.floor(Math.random() * 2) + 1;
+        const targetIndices = new Set();
+        while (targetIndices.size < Math.min(numConnections, nodes.length - 1)) {
+          const randIdx = Math.floor(Math.random() * nodes.length);
+          if (randIdx !== i) targetIndices.add(randIdx);
+        }
+        targetIndices.forEach(targetIdx => {
+          links.push({
+            source: nodes[i].id,
+            target: nodes[targetIdx].id,
+            type: relationTypes[Math.floor(Math.random() * relationTypes.length)]
+          });
+        });
+      }
+
+      setGraphNodes(nodes);
+      setGraphLinks(links);
+    }
+  }, [users]);
+
+  // PageRank calculation
+  const computePageRank = () => {
+    if (graphNodes.length === 0) return;
+    const N = graphNodes.length;
+    let pr = {};
+    graphNodes.forEach(n => pr[n.id] = 1 / N);
+    const d = 0.85;
+    const iterations = 15;
+
+    let outDegree = {};
+    graphNodes.forEach(n => outDegree[n.id] = 0);
+    graphLinks.forEach(l => {
+      outDegree[l.source] = (outDegree[l.source] || 0) + 1;
+    });
+
+    for (let iter = 0; iter < iterations; iter++) {
+      let nextPr = {};
+      graphNodes.forEach(n => nextPr[n.id] = (1 - d) / N);
+
+      let sinkPrSum = 0;
+      graphNodes.forEach(n => {
+        if (outDegree[n.id] === 0) sinkPrSum += pr[n.id];
+      });
+      graphNodes.forEach(n => {
+        nextPr[n.id] += d * (sinkPrSum / N);
+      });
+
+      graphLinks.forEach(l => {
+        if (outDegree[l.source] > 0) {
+          nextPr[l.target] += d * (pr[l.source] / outDegree[l.source]);
+        }
+      });
+      pr = nextPr;
+    }
+    setPageRankScores(pr);
+  };
+
+  // Closeness Centrality calculation
+  const computeClosenessCentrality = () => {
+    if (graphNodes.length === 0) return;
+    const adj = {};
+    graphNodes.forEach(n => adj[n.id] = []);
+    graphLinks.forEach(l => {
+      adj[l.source].push(l.target);
+      adj[l.target].push(l.source); // Undirected Closeness
+    });
+
+    const centrality = {};
+    graphNodes.forEach(start => {
+      const dist = {};
+      dist[start.id] = 0;
+      const queue = [start.id];
+      const visited = new Set([start.id]);
+
+      while (queue.length > 0) {
+        const node = queue.shift();
+        const neighbors = adj[node] || [];
+        for (let n of neighbors) {
+          if (!visited.has(n)) {
+            visited.add(n);
+            dist[n] = dist[node] + 1;
+            queue.push(n);
+          }
+        }
+      }
+
+      let sumDist = 0;
+      let reachableCount = 0;
+      graphNodes.forEach(n => {
+        if (dist[n.id] !== undefined && n.id !== start.id) {
+          sumDist += dist[n.id];
+          reachableCount++;
+        }
+      });
+
+      centrality[start.id] = sumDist > 0 ? (reachableCount / sumDist) : 0;
+    });
+    setCentralityScores(centrality);
+  };
+
+  // Shortest Path Finder (BFS)
+  const computeShortestPath = (startId, endId) => {
+    if (!startId || !endId) return [];
+    if (startId === endId) return [startId];
+    const adj = {};
+    graphNodes.forEach(n => adj[n.id] = []);
+    graphLinks.forEach(l => {
+      adj[l.source].push(l.target);
+      adj[l.target].push(l.source);
+    });
+
+    const queue = [[startId]];
+    const visited = new Set([startId]);
+
+    while (queue.length > 0) {
+      const path = queue.shift();
+      const node = path[path.length - 1];
+
+      if (node === endId) return path;
+
+      const neighbors = adj[node] || [];
+      for (let n of neighbors) {
+        if (!visited.has(n)) {
+          visited.add(n);
+          queue.push([...path, n]);
+        }
+      }
+    }
+    return [];
+  };
+
+  const handleRunPathfinder = () => {
+    const path = computeShortestPath(pathStart, pathEnd);
+    setComputedPath(path);
+    if (path.length > 0) {
+      addToast(`Path found! ${path.length - 1} degrees of separation.`, 'success');
+      const startNodeName = graphNodes.find(n => n.id === pathStart)?.name;
+      const endNodeName = graphNodes.find(n => n.id === pathEnd)?.name;
+      setSocialLogs(prev => [
+        { id: Date.now(), text: `Pathfinder run: ${startNodeName} ➔ ${endNodeName} (${path.length - 1} hops)`, time: 'Just now' },
+        ...prev
+      ]);
+    } else {
+      addToast('No path exists between these users.', 'warning');
+    }
+  };
+
+  const handleAddRelationship = () => {
+    if (!newEdgeSource || !newEdgeTarget) {
+      addToast('Select two users first.', 'warning');
+      return;
+    }
+    if (newEdgeSource === newEdgeTarget) {
+      addToast('Cannot connect a user to themselves.', 'warning');
+      return;
+    }
+
+    const exists = graphLinks.some(
+      l => (l.source === newEdgeSource && l.target === newEdgeTarget) ||
+           (l.source === newEdgeTarget && l.target === newEdgeSource)
+    );
+
+    if (exists) {
+      addToast('Relationship already exists.', 'warning');
+      return;
+    }
+
+    const newLink = { source: newEdgeSource, target: newEdgeTarget, type: newEdgeType };
+    setGraphLinks(prev => [...prev, newLink]);
+
+    const sourceName = graphNodes.find(n => n.id === newEdgeSource)?.name;
+    const targetName = graphNodes.find(n => n.id === newEdgeTarget)?.name;
+    const verb = newEdgeType === 'follow' ? 'followed (Instagram style)' : 'chatted with (StreamSDK style)';
+
+    setSocialLogs(prev => [
+      { id: Date.now(), text: `${sourceName} ${verb} ${targetName}.`, time: 'Just now' },
+      ...prev
+    ]);
+
+    addToast('New relationship edge created!', 'success');
+  };
+
+  // Recalculate metrics when nodes/links structure changes
+  useEffect(() => {
+    if (graphNodes.length > 0) {
+      computePageRank();
+      computeClosenessCentrality();
+    }
+  }, [graphNodes, graphLinks]);
+
+  // Canvas Force-directed Physics animation loop
+  useEffect(() => {
+    if (activeTab !== 'network' || !canvasRef.current || graphNodes.length === 0) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    let animationId;
+
+    const repulsion = 130;
+    const attraction = 0.04;
+    const centerAttraction = 0.015;
+    const damping = 0.85;
+
+    const runSimulation = () => {
+      // 1. Repulsion between nodes
+      for (let i = 0; i < graphNodes.length; i++) {
+        for (let j = i + 1; j < graphNodes.length; j++) {
+          const n1 = graphNodes[i];
+          const n2 = graphNodes[j];
+          const dx = n2.x - n1.x;
+          const dy = n2.y - n1.y;
+          const distSqr = dx * dx + dy * dy || 1;
+          const dist = Math.sqrt(distSqr);
+
+          if (dist < 150) {
+            const force = (150 - dist) * 0.12;
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+
+            if (n1 !== draggedNode) {
+              n1.vx -= fx;
+              n1.vy -= fy;
+            }
+            if (n2 !== draggedNode) {
+              n2.vx += fx;
+              n2.vy += fy;
+            }
+          }
+        }
+      }
+
+      // 2. Attraction along edges
+      graphLinks.forEach(link => {
+        const sourceNode = graphNodes.find(n => n.id === link.source);
+        const targetNode = graphNodes.find(n => n.id === link.target);
+        if (sourceNode && targetNode) {
+          const dx = targetNode.x - sourceNode.x;
+          const dy = targetNode.y - sourceNode.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const targetDist = 110;
+          const force = (dist - targetDist) * attraction;
+
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+
+          if (sourceNode !== draggedNode) {
+            sourceNode.vx += fx;
+            sourceNode.vy += fy;
+          }
+          if (targetNode !== draggedNode) {
+            targetNode.vx -= fx;
+            targetNode.vy -= fy;
+          }
+        }
+      });
+
+      // 3. Center attraction & Update positions
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      graphNodes.forEach(node => {
+        if (node === draggedNode) return;
+
+        node.vx += (centerX - node.x) * centerAttraction;
+        node.vy += (centerY - node.y) * centerAttraction;
+
+        node.x += node.vx;
+        node.y += node.vy;
+
+        node.vx *= damping;
+        node.vy *= damping;
+
+        node.x = Math.max(15, Math.min(canvas.width - 15, node.x));
+        node.y = Math.max(15, Math.min(canvas.height - 15, node.y));
+      });
+
+      // Clear Canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw Links
+      graphLinks.forEach(link => {
+        const sourceNode = graphNodes.find(n => n.id === link.source);
+        const targetNode = graphNodes.find(n => n.id === link.target);
+        if (sourceNode && targetNode) {
+          const isPathLink = computedPath.some((nodeId, idx) => {
+            if (idx === 0) return false;
+            return (computedPath[idx - 1] === sourceNode.id && nodeId === targetNode.id) ||
+                   (computedPath[idx - 1] === targetNode.id && nodeId === sourceNode.id);
+          });
+
+          ctx.beginPath();
+          ctx.moveTo(sourceNode.x, sourceNode.y);
+          ctx.lineTo(targetNode.x, targetNode.y);
+
+          if (isPathLink) {
+            ctx.strokeStyle = '#48BB78'; // Neon green path highlighting
+            ctx.lineWidth = 3.5;
+          } else {
+            ctx.strokeStyle = link.type === 'follow' ? 'rgba(237, 137, 54, 0.25)' : 'rgba(66, 153, 225, 0.25)';
+            ctx.lineWidth = 1.2;
+          }
+          ctx.stroke();
+        }
+      });
+
+      // Draw Nodes
+      graphNodes.forEach(node => {
+        const isHovered = hoveredNode === node;
+        const isSelected = selectedNode === node;
+        const isPathNode = computedPath.includes(node.id);
+
+        let nodeSize = 10;
+        if (algoType === 'pagerank' && pageRankScores[node.id]) {
+          nodeSize = 7 + pageRankScores[node.id] * 55;
+        } else if (algoType === 'centrality' && centralityScores[node.id]) {
+          nodeSize = 7 + centralityScores[node.id] * 20;
+        }
+
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, nodeSize + (isHovered ? 3 : 0), 0, 2 * Math.PI);
+
+        let fillColor = '#63b3ed'; // Consumer
+        if (node.role === 'seller') fillColor = '#ed8936'; // Seller
+        if (node.role === 'admin') fillColor = '#9f7aea'; // Admin
+        if (isPathNode) fillColor = '#48bb78'; // Shortest Path hit
+
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+
+        ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.15)');
+        ctx.lineWidth = isSelected ? 2.5 : 1.2;
+        ctx.stroke();
+
+        ctx.font = isHovered || isSelected ? 'bold 10px var(--font-sans)' : '9px var(--font-sans)';
+        ctx.fillStyle = isHovered || isSelected ? '#ffffff' : '#a0aec0';
+        ctx.textAlign = 'center';
+        ctx.fillText(node.name, node.x, node.y - nodeSize - 5);
+      });
+
+      animationId = requestAnimationFrame(runSimulation);
+    };
+
+    runSimulation();
+    return () => cancelAnimationFrame(animationId);
+  }, [graphNodes, graphLinks, hoveredNode, selectedNode, draggedNode, computedPath, algoType, pageRankScores, centralityScores]);
+
+  const handleCanvasMouseDown = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const clickedNode = graphNodes.find(node => {
+      const dx = node.x - x;
+      const dy = node.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      let nodeSize = 10;
+      if (algoType === 'pagerank' && pageRankScores[node.id]) {
+        nodeSize = 7 + pageRankScores[node.id] * 55;
+      } else if (algoType === 'centrality' && centralityScores[node.id]) {
+        nodeSize = 7 + centralityScores[node.id] * 20;
+      }
+      return dist < (nodeSize + 5);
+    });
+
+    if (clickedNode) {
+      setDraggedNode(clickedNode);
+      setSelectedNode(clickedNode);
+    } else {
+      setSelectedNode(null);
+    }
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (draggedNode) {
+      draggedNode.x = x;
+      draggedNode.y = y;
+      draggedNode.vx = 0;
+      draggedNode.vy = 0;
+      return;
+    }
+
+    const node = graphNodes.find(node => {
+      const dx = node.x - x;
+      const dy = node.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      let nodeSize = 10;
+      if (algoType === 'pagerank' && pageRankScores[node.id]) {
+        nodeSize = 7 + pageRankScores[node.id] * 55;
+      } else if (algoType === 'centrality' && centralityScores[node.id]) {
+        nodeSize = 7 + centralityScores[node.id] * 20;
+      }
+      return dist < (nodeSize + 5);
+    });
+    setHoveredNode(node || null);
+  };
+
+  const handleCanvasMouseUp = () => setDraggedNode(null);
 
   useEffect(() => {
     if (activeTab === 'overview') {
@@ -331,7 +775,8 @@ const AdminDashboard = () => {
     { id: 'orders', icon: ClipboardList, label: 'Orders', badge: orders.length },
     { id: 'products', icon: Package, label: 'Products', badge: products.length },
     { id: 'users', icon: Users, label: 'Customers', badge: users.length },
-    { id: 'analytics', icon: LineChart, label: 'Analytics' }
+    { id: 'analytics', icon: LineChart, label: 'Analytics' },
+    { id: 'network', icon: Share2, label: 'Social Circle' }
   ];
 
   const sysItems = [
@@ -970,6 +1415,262 @@ const AdminDashboard = () => {
                 <div className="card">
                   <div className="card-title">Payment methods</div>
                   <div style={{ position: 'relative', height: 200 }}><canvas ref={payChartRef}></canvas></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SOCIAL CIRCLE / NETWORK GRAPH PAGE */}
+          {activeTab === 'network' && (
+            <div className="page active social-circle-page">
+              <div className="topbar">
+                <div className="page-title">Social Circle Graph</div>
+                <div className="topbar-right">
+                  <div className="topbar-btn" onClick={() => {
+                    setGraphNodes([]);
+                    setGraphLinks([]);
+                    setComputedPath([]);
+                    addToast('Resetting network graph to default simulation.', 'info');
+                    // Trigger effect rebuild
+                    setUsers([...users]);
+                  }}>
+                    <RefreshCw /> Regenerate Graph
+                  </div>
+                </div>
+              </div>
+
+              <div className="social-grid">
+                {/* Left Side: Interactive Canvas */}
+                <div className="card graph-card">
+                  <div className="card-title">
+                    Interactive Social Network Graph
+                    <span className="card-title-sub">Physics-based force-directed simulation</span>
+                  </div>
+
+                  <div className="canvas-container">
+                    <canvas
+                      ref={canvasRef}
+                      width={640}
+                      height={440}
+                      className="network-canvas"
+                      onMouseDown={handleCanvasMouseDown}
+                      onMouseMove={handleCanvasMouseMove}
+                      onMouseUp={handleCanvasMouseUp}
+                      onMouseLeave={handleCanvasMouseUp}
+                    ></canvas>
+                  </div>
+
+                  <div className="legend-row">
+                    <div className="legend-item"><span className="legend-dot" style={{ background: '#63b3ed' }}></span> Buyer</div>
+                    <div className="legend-item"><span className="legend-dot" style={{ background: '#ed8936' }}></span> Seller</div>
+                    <div className="legend-item"><span className="legend-dot" style={{ background: '#9f7aea' }}></span> Admin</div>
+                    <div className="legend-item"><span className="legend-dot" style={{ background: '#48bb78' }}></span> Shortest Path</div>
+                    <div className="legend-item"><span className="legend-line follow"></span> Follow (Insta)</div>
+                    <div className="legend-item"><span className="legend-line chat"></span> Chat (StreamSDK)</div>
+                  </div>
+                </div>
+
+                {/* Right Side: Algorithms & Simulator */}
+                <div className="social-controls-wrapper">
+                  <div className="card controls-card">
+                    <div className="tabs-header">
+                      <button className={`tab-btn ${algoType === 'pagerank' ? 'active' : ''}`} onClick={() => { setAlgoType('pagerank'); setComputedPath([]); }}>PageRank</button>
+                      <button className={`tab-btn ${algoType === 'centrality' ? 'active' : ''}`} onClick={() => { setAlgoType('centrality'); setComputedPath([]); }}>Centrality</button>
+                      <button className={`tab-btn ${algoType === 'pathfinder' ? 'active' : ''}`} onClick={() => { setAlgoType('pathfinder'); setComputedPath([]); }}>Pathfinder</button>
+                      <button className={`tab-btn ${algoType === 'simulator' ? 'active' : ''}`} onClick={() => { setAlgoType('simulator'); setComputedPath([]); }}>Simulate</button>
+                    </div>
+
+                    <div className="tab-content" style={{ marginTop: 12 }}>
+                      {/* PAGERANK */}
+                      {algoType === 'pagerank' && (
+                        <div>
+                          <p className="tab-desc"><strong>PageRank Algorithm:</strong> Measures the influence score of users based on incoming follow and chat connections (like Google's search algorithm & Instagram suggestions).</p>
+                          <div className="rank-list">
+                            {graphNodes
+                              .map(n => ({ ...n, score: pageRankScores[n.id] || 0 }))
+                              .sort((a, b) => b.score - a.score)
+                              .slice(0, 5)
+                              .map((n, idx) => (
+                                <div key={n.id} className="rank-item" onClick={() => setSelectedNode(n)}>
+                                  <span className="rank-num">#{idx + 1}</span>
+                                  <div className="rank-info">
+                                    <div className="rank-name">{n.name}</div>
+                                    <div className="rank-role">{n.role}</div>
+                                  </div>
+                                  <span className="rank-score">{(n.score * 100).toFixed(1)}%</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CLOSENESS CENTRALITY */}
+                      {algoType === 'centrality' && (
+                        <div>
+                          <p className="tab-desc"><strong>Closeness Centrality:</strong> Calculates how close a user is to all other users in the network. Higher score represents a user who can broadcast messages fastest (StreamSDK chat speed hubs).</p>
+                          <div className="rank-list">
+                            {graphNodes
+                              .map(n => ({ ...n, score: centralityScores[n.id] || 0 }))
+                              .sort((a, b) => b.score - a.score)
+                              .slice(0, 5)
+                              .map((n, idx) => (
+                                <div key={n.id} className="rank-item" onClick={() => setSelectedNode(n)}>
+                                  <span className="rank-num">#{idx + 1}</span>
+                                  <div className="rank-info">
+                                    <div className="rank-name">{n.name}</div>
+                                    <div className="rank-role">{n.role}</div>
+                                  </div>
+                                  <span className="rank-score">{n.score.toFixed(2)}</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PATHFINDER */}
+                      {algoType === 'pathfinder' && (
+                        <div className="pathfinder-inputs">
+                          <p className="tab-desc"><strong>Dijkstra / BFS Pathfinder:</strong> Computes the degrees of separation between any two members of the platform (like LinkedIn connections/mutual friends).</p>
+                          
+                          <div className="input-group">
+                            <label>Start User</label>
+                            <select value={pathStart} onChange={e => { setPathStart(e.target.value); setComputedPath([]); }} className="toolbar-select" style={{ width: '100%', margin: '4px 0 10px' }}>
+                              <option value="">Select starting user...</option>
+                              {graphNodes.map(n => <option key={n.id} value={n.id}>{n.name} ({n.role})</option>)}
+                            </select>
+                          </div>
+
+                          <div className="input-group">
+                            <label>End User</label>
+                            <select value={pathEnd} onChange={e => { setPathEnd(e.target.value); setComputedPath([]); }} className="toolbar-select" style={{ width: '100%', margin: '4px 0 12px' }}>
+                              <option value="">Select target user...</option>
+                              {graphNodes.map(n => <option key={n.id} value={n.id}>{n.name} ({n.role})</option>)}
+                            </select>
+                          </div>
+
+                          <button className="topbar-btn" style={{ width: '100%', justifyContent: 'center', background: 'var(--color-text-info)', color: '#fff', border: 'none', padding: '10px' }} onClick={handleRunPathfinder}>
+                            Find Shortest Path
+                          </button>
+
+                          {computedPath.length > 0 && (
+                            <div className="path-result">
+                              <label>Connection Path:</label>
+                              <div className="path-breadcrumbs">
+                                {computedPath.map((nodeId, idx) => {
+                                  const name = graphNodes.find(n => n.id === nodeId)?.name || 'Unknown';
+                                  return (
+                                    <span key={nodeId} className="path-crumb">
+                                      {name} {idx < computedPath.length - 1 && ' ➔ '}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* SIMULATOR */}
+                      {algoType === 'simulator' && (
+                        <div className="edge-simulator">
+                          <p className="tab-desc"><strong>Social Connection Simulator:</strong> Establish relationship connections (follows/chats) between any users to dynamically evolve the graph database.</p>
+                          
+                          <div className="input-group">
+                            <label>From User</label>
+                            <select value={newEdgeSource} onChange={e => setNewEdgeSource(e.target.value)} className="toolbar-select" style={{ width: '100%', margin: '4px 0 10px' }}>
+                              <option value="">Select source...</option>
+                              {graphNodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                            </select>
+                          </div>
+
+                          <div className="input-group">
+                            <label>Relation Type</label>
+                            <select value={newEdgeType} onChange={e => setNewEdgeType(e.target.value)} className="toolbar-select" style={{ width: '100%', margin: '4px 0 10px' }}>
+                              <option value="follow">Follows (Instagram)</option>
+                              <option value="chat">Chats with (StreamSDK)</option>
+                            </select>
+                          </div>
+
+                          <div className="input-group">
+                            <label>To User</label>
+                            <select value={newEdgeTarget} onChange={e => setNewEdgeTarget(e.target.value)} className="toolbar-select" style={{ width: '100%', margin: '4px 0 12px' }}>
+                              <option value="">Select target...</option>
+                              {graphNodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                            </select>
+                          </div>
+
+                          <button className="topbar-btn" style={{ width: '100%', justifyContent: 'center', background: 'var(--color-text-warning)', color: '#fff', border: 'none', padding: '10px' }} onClick={handleAddRelationship}>
+                            Simulate Connection Edge
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Inspector Panel */}
+                  <div className="card inspector-card">
+                    <div className="card-title">Node Inspector</div>
+                    {selectedNode ? (
+                      <div className="inspector-content">
+                        <div className="inspector-header">
+                          <div className="inspector-avatar" style={{
+                            background: selectedNode.role === 'seller' ? '#ed8936' : selectedNode.role === 'admin' ? '#9f7aea' : '#63b3ed'
+                          }}>
+                            {selectedNode.name[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="inspector-name">{selectedNode.name}</div>
+                            <div className="inspector-username">@{selectedNode.username}</div>
+                          </div>
+                        </div>
+                        <div className="inspector-details" style={{ marginTop: 12 }}>
+                          <div className="inspector-row">
+                            <span className="ins-label">Role:</span>
+                            <span className="ins-val" style={{ textTransform: 'capitalize' }}>{selectedNode.role}</span>
+                          </div>
+                          <div className="inspector-row">
+                            <span className="ins-label">PageRank:</span>
+                            <span className="ins-val">{((pageRankScores[selectedNode.id] || 0) * 100).toFixed(2)}%</span>
+                          </div>
+                          <div className="inspector-row">
+                            <span className="ins-label">Centrality:</span>
+                            <span className="ins-val">{(centralityScores[selectedNode.id] || 0).toFixed(3)}</span>
+                          </div>
+                          <div className="inspector-row" style={{ flexDirection: 'column', alignItems: 'flex-start', marginTop: 8 }}>
+                            <span className="ins-label" style={{ marginBottom: 4 }}>Connections:</span>
+                            <div className="ins-connections-list">
+                              {graphLinks.filter(l => l.source === selectedNode.id || l.target === selectedNode.id).map((l, idx) => {
+                                const otherId = l.source === selectedNode.id ? l.target : l.source;
+                                const otherName = graphNodes.find(n => n.id === otherId)?.name || 'Unknown';
+                                const direction = l.source === selectedNode.id ? '➔' : 'Received';
+                                return (
+                                  <div key={idx} className="connection-tag">
+                                    {l.type === 'follow' ? <Heart size={10} style={{ color: '#ed8936' }} /> : <MessageSquare size={10} style={{ color: '#63b3ed' }} />}
+                                    <span>{direction} {otherName}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="inspector-empty">Click on a user node in the network graph to inspect details.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Activity Logs for Social Actions */}
+              <div className="full-card social-logs-card" style={{ marginTop: 20 }}>
+                <div className="card-title">Live Social Graph Activities</div>
+                <div className="social-log-items">
+                  {socialLogs.map(log => (
+                    <div key={log.id} className="social-log-row">
+                      <span className="log-time">{log.time}</span>
+                      <span className="log-text">{log.text}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

@@ -9,6 +9,7 @@ import Wishlist from './pages/Wishlist';
 import PublicWishlist from './pages/PublicWishlist';
 import Orders from './pages/Orders';
 import Profile from './pages/Profile';
+import Social from './pages/Social';
 import SellerPanel from './pages/SellerPanel';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
@@ -42,6 +43,7 @@ function App() {
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/wishlist/public/:username" element={<PublicWishlist />} />
+                <Route path="/social" element={<Social />} />
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/account" element={<Profile />} />
 

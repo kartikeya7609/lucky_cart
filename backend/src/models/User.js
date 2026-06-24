@@ -57,7 +57,18 @@ const userSchema = new mongoose.Schema({
   profile_pic: {
     type: String,
     default: ''
-  }
+  },
+  is_private: {
+    type: Boolean,
+    default: false
+  },
+  influence_score: {
+    type: Number,
+    default: 0
+  },
+  interests: [{
+    type: String
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

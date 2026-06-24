@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -14,6 +15,8 @@ import wishlistRoutes from './routes/wishlistRoutes.js';
 import addressRoutes from './routes/addressRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import socialRoutes from './routes/socialRoutes.js';
+import { setupSocket } from './config/socket.js';
 
 dotenv.config();
 
@@ -21,6 +24,7 @@ dotenv.config();
 connectDB();
 
 const app = express();
+const server = http.createServer(app);
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 
@@ -42,7 +46,7 @@ app.use(helmet({
 // CORS Configuration
 const allowedOrigins = process.env.CLIENT_URL 
   ? process.env.CLIENT_URL.split(',').map(url => url.trim())
-  : ['http://localhost:5173'];
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -96,6 +100,7 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/social', socialRoutes);
 
 // Root route
 app.get('/', (req, res) => {
@@ -108,6 +113,9 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Internal Server Error', error: err.message });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// Setup socket connections
+setupSocket(server, allowedOrigins);
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });

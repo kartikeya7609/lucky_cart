@@ -19,7 +19,8 @@ import {
   AlertTriangle,
   ClipboardList, 
   Clover,
-  Download
+  Download,
+  Users
 } from 'lucide-react';
 
 const Navbar = () => {
@@ -181,6 +182,19 @@ const Navbar = () => {
                       >
                         <Heart size={16} />
                         Wishlist
+                      </Link>
+                    </li>
+                    <li>
+                      <Link 
+                        to="/social"
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                          isActive('/social') 
+                            ? 'bg-white/10 text-white border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]' 
+                            : 'text-gray-500 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <Users size={16} />
+                        Social
                       </Link>
                     </li>
                     <li>
@@ -465,6 +479,16 @@ const Navbar = () => {
             >
               <Heart size={20} className={isActive('/wishlist') ? 'drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''} />
               <span className="text-[9px] font-black uppercase tracking-widest">Saved</span>
+            </Link>
+
+            <Link 
+              to="/social"
+              className={`flex-1 flex flex-col items-center justify-center h-full space-y-1 transition-all ${
+                isActive('/social') ? 'text-blue-400' : 'text-gray-500 hover:text-white'
+              }`}
+            >
+              <Users size={20} className={isActive('/social') ? 'drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''} />
+              <span className="text-[9px] font-black uppercase tracking-widest">Social</span>
             </Link>
           </>
         )}
