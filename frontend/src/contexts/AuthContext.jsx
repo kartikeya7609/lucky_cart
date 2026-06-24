@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { api } from '../utils/api';
+import { api, setTokenUpdateListener } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -46,6 +46,18 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   }, [token]);
+
+  useEffect(() => {
+    setTokenUpdateListener((newToken) => {
+      setToken(newToken);
+      if (!newToken) {
+        setUser(null);
+        addToast('Session expired. Please log in again.', 'info');
+      }
+    });
+    return () => setTokenUpdateListener(null);
+  }, []);
+
 
   // Login handler
   const login = async (usernameOrToken, passwordOrUser) => {

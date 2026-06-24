@@ -31,6 +31,10 @@ export const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      console.warn('JWT expired');
+      return res.status(401).json({ message: 'Token expired', code: 'TOKEN_EXPIRED' });
+    }
     console.error(error);
     return res.status(401).json({ message: 'Not authorized, token invalid or expired' });
   }
