@@ -451,6 +451,30 @@ export const leaveGroup = async (req, res) => {
   }
 };
 
+// Fetch all groups the user has joined
+export const getJoinedGroups = async (req, res) => {
+  try {
+    const { Group, Message } = await import('../models/index.js');
+    const groups = await Group.find({ members: req.user._id })
+      .populate('creator', 'username full_name profile_pic')
+      .populate('members', 'username full_name profile_pic');
+
+    const groupsWithLastMsg = await Promise.all(groups.map(async (group) => {
+      const lastMsg = await Message.findOne({ group: group._id })
+        .populate('sender', 'username full_name profile_pic')
+        .sort({ createdAt: -1 });
+      return {
+        group,
+        lastMessage: lastMsg
+      };
+    }));
+
+    res.status(200).json(groupsWithLastMsg);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Fetch group details, members, and shared products
 export const getGroupDetails = async (req, res) => {
   try {
@@ -551,6 +575,12 @@ export const getChatMessages = async (req, res) => {
     const currentUserId = req.user._id;
     const { Message } = await import('../models/index.js');
 
+    // Mark incoming messages as read
+    await Message.updateMany(
+      { sender: targetUserId, recipient: currentUserId, is_read: false },
+      { $set: { is_read: true } }
+    );
+
     const messages = await Message.find({
       $or: [
         { sender: currentUserId, recipient: targetUserId },
@@ -561,6 +591,10 @@ export const getChatMessages = async (req, res) => {
     .populate('recipient', 'username full_name profile_pic')
     .populate('metadata.productId', 'name price user_file description')
     .populate('metadata.cartItems.product', 'name price user_file description')
+    .populate({
+      path: 'replyTo',
+      populate: { path: 'sender', select: 'username full_name' }
+    })
     .sort({ createdAt: 1 });
 
     res.status(200).json(messages);
@@ -585,6 +619,10 @@ export const getGroupChatMessages = async (req, res) => {
       .populate('sender', 'username full_name profile_pic')
       .populate('metadata.productId', 'name price user_file description')
       .populate('metadata.cartItems.product', 'name price user_file description')
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'sender', select: 'username full_name' }
+      })
       .sort({ createdAt: 1 });
 
     res.status(200).json(messages);

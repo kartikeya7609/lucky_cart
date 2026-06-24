@@ -16,6 +16,11 @@ const messageSchema = new mongoose.Schema({
     ref: 'Group',
     default: null // null if it is a direct message
   },
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+    default: null
+  },
   message_type: {
     type: String,
     enum: ['TEXT', 'PRODUCT', 'WISHLIST', 'CART', 'SYSTEM'],
@@ -50,6 +55,11 @@ const messageSchema = new mongoose.Schema({
   is_read: {
     type: Boolean,
     default: false
+  },
+  reactions: {
+    type: Map,
+    of: [String],
+    default: {}
   }
 }, {
   timestamps: true

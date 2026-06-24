@@ -6,7 +6,8 @@ import {
   Search, UserPlus, UserCheck, UserMinus, Clock, Globe, Lock, 
   MessageSquare, User as UserIcon, Shield, Sparkles, ArrowRight,
   ShoppingCart, Heart, Camera, Send, Check, X, ArrowLeft,
-  Users, Share2, Plus, Info, ExternalLink, RefreshCw, Copy, TrendingUp, Award, Star
+  Users, Share2, Plus, Info, ExternalLink, RefreshCw, Copy, TrendingUp, Award, Star,
+  Phone, Video, MoreVertical, Smile, Paperclip
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { StreamChat } from 'stream-chat';
@@ -15,10 +16,11 @@ import 'stream-chat-react/dist/css/index.css';
 
 const Social = () => {
   const { token, user, addToast } = useAuth();
-  const { refreshCart } = useCart();
+  const { cartItems, refreshCart } = useCart();
 
   // Socket reference
   const socketRef = useRef(null);
+  const activeChatRef = useRef(null);
 
   // UI Panels state
   const [activeTab, setActiveTab] = useState('feed'); // 'feed', 'wishlists', 'carts'
@@ -26,6 +28,11 @@ const Social = () => {
   const [chatMessages, setChatMessages] = useState([]);
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [onlineStatusMap, setOnlineStatusMap] = useState({});
+  const [replyTo, setReplyTo] = useState(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [conversations, setConversations] = useState([]);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
 
   // Stream Chat states
   const [streamClient, setStreamClient] = useState(null);
@@ -68,7 +75,12 @@ const Social = () => {
 
   const chatEndRef = useRef(null);
 
-  // Initialize Socket and Load Data
+  // Keep activeChatRef in sync
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
+  // Initialize Socket connection ONCE (depends only on token)
   useEffect(() => {
     if (!token) return;
 
@@ -82,25 +94,33 @@ const Social = () => {
     });
     socketRef.current = socket;
 
-    // Listeners
+    // Listeners — use activeChatRef.current to always read the latest value
     socket.on('receive_dm', (msg) => {
-      if (activeChat && activeChat.type === 'dm' && 
-          (msg.sender._id === activeChat.id || msg.recipient._id === activeChat.id)) {
+      const chat = activeChatRef.current;
+      if (chat && chat.type === 'dm' && 
+          (msg.sender._id === chat.id || msg.recipient?._id === chat.id)) {
         setChatMessages(prev => [...prev, msg]);
       }
       fetchRecentConversations();
     });
 
     socket.on('receive_group_msg', (data) => {
-      if (activeChat && activeChat.type === 'group' && data.groupId === activeChat.id) {
+      const chat = activeChatRef.current;
+      if (chat && chat.type === 'group' && data.groupId === chat.id) {
         setChatMessages(prev => [...prev, data.message]);
       }
+      fetchRecentConversations();
+    });
+
+    socket.on('message_reaction_updated', (data) => {
+      setChatMessages(prev => prev.map(m => m._id === data.messageId ? data.message : m));
     });
 
     socket.on('user_typing_start', (data) => {
-      if (activeChat && activeChat.type === 'dm' && data.userId === activeChat.id) {
+      const chat = activeChatRef.current;
+      if (chat && chat.type === 'dm' && data.userId === chat.id) {
         setTypingUsers(prev => new Set([...prev, data.username]));
-      } else if (activeChat && activeChat.type === 'group' && data.groupId === activeChat.id) {
+      } else if (chat && chat.type === 'group' && data.groupId === chat.id) {
         setTypingUsers(prev => new Set([...prev, data.username]));
       }
     });
@@ -124,15 +144,38 @@ const Social = () => {
       setOnlineStatusMap(prev => ({ ...prev, ...statusMap }));
     });
 
+    socket.on('messages_read_by_recipient', (data) => {
+      const chat = activeChatRef.current;
+      if (chat && chat.type === 'dm' && data.readerId === chat.id) {
+        setChatMessages(prev => prev.map(m => ({ ...m, is_read: true })));
+      }
+    });
+
     // Load initial data
     loadAllSocialData();
 
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
+        socketRef.current = null;
       }
     };
-  }, [token, activeChat]);
+  }, [token]);
+
+  // Join/leave group rooms, track active chat and mark messages read when activeChat changes
+  useEffect(() => {
+    if (!socketRef.current) return;
+    if (activeChat) {
+      socketRef.current.emit('set_active_chat', { chatId: activeChat.id });
+      if (activeChat.type === 'group') {
+        socketRef.current.emit('join_group', { groupId: activeChat.id });
+      } else if (activeChat.type === 'dm') {
+        socketRef.current.emit('mark_messages_read', { senderId: activeChat.id });
+      }
+    } else {
+      socketRef.current.emit('set_active_chat', { chatId: null });
+    }
+  }, [activeChat]);
 
   // Clean up Stream Chat client on unmount or client change
   useEffect(() => {
@@ -183,11 +226,43 @@ const Social = () => {
 
   const fetchRecentConversations = async () => {
     try {
-      const convs = await api.get('/social/chat/conversations', token);
-      setRecentChatsList(convs);
+      const dmConvs = await api.get('/social/chat/conversations', token);
+      
+      let groupConvs = [];
+      try {
+        groupConvs = await api.get('/social/groups/joined', token);
+      } catch (err) {
+        console.warn('Failed to fetch joined groups:', err);
+      }
 
-      // Query online status for these users
-      const userIds = convs.map(c => c.user._id);
+      // Map DMs
+      const mappedDMs = dmConvs.map(c => ({
+        type: 'dm',
+        id: c.user._id,
+        name: c.user.full_name,
+        user: c.user,
+        lastMessage: c.lastMessage,
+        updatedAt: c.lastMessage?.createdAt || c.user.createdAt || new Date(0)
+      }));
+
+      // Map Groups
+      const mappedGroups = groupConvs.map(g => ({
+        type: 'group',
+        id: g.group._id,
+        name: g.group.name,
+        group: g.group,
+        lastMessage: g.lastMessage,
+        updatedAt: g.lastMessage?.createdAt || g.group.createdAt || new Date(0)
+      }));
+
+      // Merge and sort by updatedAt desc
+      const merged = [...mappedDMs, ...mappedGroups].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+      setConversations(merged);
+      setRecentChatsList(dmConvs);
+
+      // Query online status for DMs
+      const userIds = dmConvs.map(c => c.user._id);
       if (userIds.length > 0 && socketRef.current) {
         socketRef.current.emit('check_online_status', { userIds });
       }
@@ -308,65 +383,19 @@ const Social = () => {
       profile_pic: target.profile_pic || null
     });
     setChatMessages([]);
-    
-    // Disconnect previous Stream client if any
-    if (streamClient) {
-      try {
-        await streamClient.disconnectUser();
-      } catch (e) {
-        console.error(e);
-      }
-      setStreamClient(null);
-      setStreamChannel(null);
-    }
     setIsStreamActive(false);
 
-    try {
-      const res = await api.get('/social/stream-token', token);
-      if (res.token && res.token !== 'mock_token' && res.apiKey && res.apiKey !== 'mock_key' && !res.apiKey.startsWith('your_')) {
-        const client = StreamChat.getInstance(res.apiKey);
-        await client.connectUser(
-          {
-            id: res.user.id,
-            name: res.user.name,
-            image: res.user.image
-          },
-          res.token
-        );
-
-        let channel;
-        if (type === 'dm') {
-          const members = [res.user.id, target._id.toString()].sort();
-          channel = client.channel('messaging', `chat-${members.join('-')}`, {
-            name: target.full_name,
-            members
-          });
-        } else {
-          channel = client.channel('team', `group-${target._id.toString()}`, {
-            name: target.name
-          });
-        }
-
-        await channel.watch();
-        setStreamClient(client);
-        setStreamChannel(channel);
-        setIsStreamActive(true);
-        return;
-      }
-    } catch (err) {
-      console.warn('Stream Chat SDK init failed, falling back to Socket.io:', err.message);
-    }
-
+    // Load chat history directly from MongoDB via our API
     try {
       if (type === 'dm') {
         const history = await api.get(`/social/chat/messages/${target._id}`, token);
-        setChatMessages(history);
+        setChatMessages(Array.isArray(history) ? history : []);
       } else {
         const history = await api.get(`/social/chat/group-messages/${target._id}`, token);
-        setChatMessages(history);
+        setChatMessages(Array.isArray(history) ? history : []);
       }
       setTimeout(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
       }, 100);
     } catch (err) {
       console.error('Failed to load chat history:', err);
@@ -379,23 +408,34 @@ const Social = () => {
     if (!chatInput.trim() && !metadata) return;
 
     if (socketRef.current && activeChat) {
+      const payload = {
+        content: chatInput || (metadata ? `Shared content` : ''),
+        messageType: metadata ? metadata.type : 'TEXT',
+        metadata: metadata ? metadata.payload : null,
+        replyTo: replyTo ? replyTo._id : null
+      };
+
       if (activeChat.type === 'dm') {
         socketRef.current.emit('send_dm', {
           recipientId: activeChat.id,
-          content: chatInput || (metadata ? `Shared content` : ''),
-          messageType: metadata ? metadata.type : 'TEXT',
-          metadata: metadata ? metadata.payload : null
+          ...payload
         });
       } else {
         socketRef.current.emit('send_group_msg', {
           groupId: activeChat.id,
-          content: chatInput || (metadata ? `Shared content` : ''),
-          messageType: metadata ? metadata.type : 'TEXT',
-          metadata: metadata ? metadata.payload : null
+          ...payload
         });
       }
       setChatInput('');
+      setReplyTo(null);
       socketRef.current.emit('typing_stop', { targetId: activeChat.id, isGroup: activeChat.type === 'group' });
+    }
+  };
+
+  // Toggle Reaction via socket
+  const toggleReaction = (messageId, emoji) => {
+    if (socketRef.current) {
+      socketRef.current.emit('toggle_reaction', { messageId, emoji });
     }
   };
 
@@ -467,6 +507,52 @@ const Social = () => {
   const getInitials = (name) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getAvatarBgColor = (name) => {
+    if (!name) return '#555555';
+    const colors = [
+      '#991b1b', // Red-dark
+      '#065f46', // Green-emerald
+      '#3730a3', // Indigo
+      '#854d0e', // Yellow-gold
+      '#581c87', // Purple
+      '#1e3a8a', // Blue
+      '#155e75', // Cyan
+      '#166534', // Green
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
+  const renderAvatar = (userObj, size = 40, isGroup = false, status = null) => {
+    const name = isGroup 
+      ? (userObj?.name || 'Group')
+      : (userObj?.full_name || userObj?.username || 'User');
+    const initials = getInitials(name);
+    const bgColor = getAvatarBgColor(name);
+
+    let content;
+    if (isGroup) {
+      content = <Users size={size * 0.45} style={{ color: '#fff' }} />;
+    } else if (userObj?.profile_pic) {
+      content = <img src={userObj.profile_pic} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />;
+    } else {
+      content = initials;
+    }
+
+    const bg = isGroup ? '#1e3a8a' : (userObj?.profile_pic ? 'transparent' : bgColor);
+
+    return (
+      <div className="chat-fs-avatar" style={{ width: size, height: size, minWidth: size, background: bg, fontSize: size * 0.35, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+        {content}
+        {status}
+      </div>
+    );
   };
 
   const getUserAvatarUrl = (userObj) => {
@@ -612,373 +698,763 @@ const Social = () => {
         .pm-btn-primary { background: #1aad52; color: #fff; flex: 1; }
         .pm-btn-primary:hover { background: #158a42; }
         .pm-btn-secondary { background: var(--color-background-secondary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-tertiary); }
-        .pm-btn-secondary:hover { background: var(--color-border-tertiary); }
+.pm-btn-secondary:hover { background: var(--color-border-tertiary); }
         .pm-btn-danger { background: transparent; color: #ef4444; border: 0.5px solid rgba(239,68,68,0.3); }
         .pm-btn-danger:hover { background: rgba(239,68,68,0.1); }
         .pm-private-msg { text-align: center; padding: 20px; color: var(--color-text-tertiary); font-size: 13px; }
 
-        /* Full-screen Chat layout */
+        /* ═══════ CHAT LAYOUT — matching reference design ═══════ */
         .chat-fullscreen-container {
+          --green: #22c55e;
+          --green-dark: #16a34a;
+          --green-dim: rgba(34,197,94,0.12);
+          --bg: #0d0d0d;
+          --bg2: #141414;
+          --bg3: #1a1a1a;
+          --bg4: #222222;
+          --border: rgba(255,255,255,0.06);
+          --border2: rgba(255,255,255,0.10);
+          --text: #e8e8e8;
+          --text2: #999;
+          --text3: #555;
+          --bubble-out: #1b5e20;
+          --bubble-in: #1e1e1e;
+          --radius: 14px;
+
           display: flex;
           height: calc(100vh - 120px);
           min-height: 500px;
-          background: var(--color-background-primary);
-          color: #fff;
-          font-family: var(--font-sans);
-          border-radius: var(--border-radius-lg);
-          border: 0.5px solid var(--color-border-tertiary);
+          background: var(--bg);
+          color: var(--text);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+          border: 0.5px solid var(--border2);
+          border-radius: 16px;
           overflow: hidden;
-          margin: 16px;
+          margin: 12px;
         }
+
+        /* ── Sidebar ── */
         .chat-fs-sidebar {
-          width: 280px;
-          background: var(--color-background-primary);
-          border-right: 0.5px solid var(--color-border-tertiary);
+          width: 260px;
+          min-width: 260px;
+          border-right: 0.5px solid var(--border);
           display: flex;
           flex-direction: column;
+          background: var(--bg2);
           flex-shrink: 0;
         }
+
         .chat-fs-sidebar-header {
-          padding: 14px 16px;
-          border-bottom: 0.5px solid var(--color-border-tertiary);
+          padding: 16px 16px 12px;
+          border-bottom: 0.5px solid var(--border);
           display: flex;
           align-items: center;
           justify-content: space-between;
-          background: var(--color-background-primary);
         }
-        .chat-fs-sidebar-title {
-          font-size: 13px;
+
+        .chat-fs-sidebar-header h2 {
+          font-size: 16px;
           font-weight: 600;
-          color: var(--color-text-primary);
+          color: var(--text);
+          margin: 0;
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 0;
         }
-        .chat-fs-back-btn {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 12px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 0.5px solid rgba(255, 255, 255, 0.1);
-          border-radius: var(--border-radius-md);
-          font-size: 11px;
-          font-weight: 500;
-          color: var(--color-text-secondary);
+
+        .chat-fs-icon-btn {
+          background: none;
+          border: none;
+          color: var(--text2);
           cursor: pointer;
-          transition: all 0.2s;
+          padding: 4px;
+          font-size: 13px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          border-radius: 50%;
+          width: 28px;
+          height: 28px;
+          justify-content: center;
+          transition: color .2s, background .2s;
         }
-        .chat-fs-back-btn:hover {
-          background: rgba(255, 255, 255, 0.1);
-          color: var(--color-text-primary);
+
+        .chat-fs-icon-btn:hover {
+          color: var(--text);
+          background: var(--bg3);
         }
+
+        .chat-fs-search-bar {
+          margin: 8px 12px;
+          position: relative;
+        }
+
+        .chat-fs-search-bar input {
+          width: 100%;
+          background: var(--bg3);
+          border: none;
+          border-radius: 8px;
+          color: var(--text);
+          font-size: 13px;
+          padding: 8px 12px 8px 32px;
+          outline: none;
+        }
+
+        .chat-fs-search-bar input::placeholder { color: var(--text3); }
+
+        .chat-fs-search-bar svg {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--text3);
+        }
+
         .chat-fs-list {
           flex: 1;
           overflow-y: auto;
-          padding: 8px;
+          padding: 2px 0;
         }
+
+        .chat-fs-list::-webkit-scrollbar { width: 3px; }
+        .chat-fs-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
         .chat-fs-item {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 10px;
-          border-radius: var(--border-radius-md);
+          gap: 10px;
+          padding: 10px 14px;
           cursor: pointer;
-          transition: background 0.15s;
-          margin-bottom: 4px;
+          transition: background .12s;
+          border-left: 3px solid transparent;
         }
-        .chat-fs-item:hover {
-          background: var(--color-background-secondary);
-        }
+
+        .chat-fs-item:hover { background: rgba(255,255,255,0.03); }
+
         .chat-fs-item.active {
-          background: rgba(26, 173, 82, 0.08);
-          border: 0.5px solid rgba(26, 173, 82, 0.2);
+          background: rgba(34,197,94,0.08);
+          border-left-color: var(--green);
         }
+
+        .chat-fs-avatar {
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 700;
+          color: #fff;
+          position: relative;
+          overflow: hidden;
+          flex-shrink: 0;
+        }
+
+        .chat-fs-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 50%;
+        }
+
+        .chat-fs-avatar .status-dot {
+          position: absolute;
+          bottom: 0;
+          right: 0;
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: 2px solid var(--bg2);
+        }
+
+        .chat-fs-avatar .status-dot.online { background: var(--green); }
+
+        .chat-fs-info { flex: 1; min-width: 0; }
+
+        .chat-fs-name {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .chat-fs-item.active .chat-fs-name { color: var(--green); font-weight: 600; }
+
+        .chat-fs-preview {
+          font-size: 12px;
+          color: var(--text3);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-top: 2px;
+        }
+
+        .chat-fs-time {
+          font-size: 11px;
+          color: var(--text3);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        /* ── Main Chat Pane ── */
         .chat-fs-main {
           flex: 1;
           display: flex;
           flex-direction: column;
-          background: var(--color-background-secondary);
-          position: relative;
+          background: var(--bg);
+          min-width: 0;
         }
+
         .chat-fs-header {
-          height: 56px;
-          padding: 0 16px;
-          background: var(--color-background-primary);
-          border-bottom: 0.5px solid var(--color-border-tertiary);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          z-index: 10;
-        }
-        .chat-fs-user-info {
           display: flex;
           align-items: center;
           gap: 10px;
-          cursor: pointer;
+          padding: 12px 18px;
+          border-bottom: 0.5px solid var(--border);
+          background: var(--bg2);
         }
-        .chat-fs-username {
-          font-size: 13px;
+
+        .chat-fs-header-info { flex: 1; min-width: 0; }
+
+        .chat-fs-header-name {
+          font-size: 15px;
           font-weight: 600;
-          color: var(--color-text-primary);
+          color: var(--text);
         }
-        .chat-fs-status {
-          font-size: 10px;
-          color: #1aad52;
+
+        .chat-fs-header-status {
+          font-size: 12px;
+          color: var(--green);
+          margin-top: 1px;
           display: flex;
           align-items: center;
           gap: 4px;
-          margin-top: 1px;
         }
-        .chat-fs-status.offline {
-          color: var(--color-text-tertiary);
+
+        .chat-fs-header-status::before {
+          content: '';
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--green);
+          display: inline-block;
         }
-        .chat-fs-actions {
+
+        .chat-fs-header-status.offline {
+          color: var(--text3);
+        }
+
+        .chat-fs-header-status.offline::before {
+          background: var(--text3);
+        }
+
+        .chat-fs-hdr-actions {
           display: flex;
-          align-items: center;
           gap: 8px;
+          align-items: center;
         }
-        .chat-fs-btn {
-          padding: 6px 12px;
-          border-radius: var(--border-radius-md);
-          font-size: 11px;
-          font-weight: 600;
+
+        .hdr-dot-btn {
+          width: 14px;
+          height: 14px;
+          border: 1px solid rgba(255,255,255,0.15);
+          border-radius: 50%;
+          background: transparent;
+        }
+
+        .chat-fs-hdr-btn {
+          background: none;
+          border: none;
+          color: var(--text3);
           cursor: pointer;
+          padding: 6px;
+          border-radius: 50%;
           display: flex;
           align-items: center;
-          gap: 5px;
-          border: none;
-          font-family: var(--font-sans);
-          transition: background 0.15s;
+          transition: color .15s, background .15s;
         }
-        .chat-fs-btn-primary {
-          background: #1aad52;
-          color: #fff;
+
+        .chat-fs-hdr-btn:hover {
+          color: var(--text);
+          background: var(--bg3);
         }
-        .chat-fs-btn-primary:hover {
-          background: #158a42;
+
+        .chat-fs-hdr-btn.active {
+          color: var(--green);
+          background: var(--green-dim);
         }
-        .chat-fs-btn-secondary {
-          background: var(--color-background-secondary);
-          color: var(--color-text-secondary);
-          border: 0.5px solid var(--color-border-tertiary);
-        }
-        .chat-fs-btn-secondary:hover {
-          background: var(--color-background-tertiary);
-          color: var(--color-text-primary);
-        }
+
+        /* ── Messages Area ── */
         .chat-fs-messages {
           flex: 1;
           overflow-y: auto;
-          padding: 16px 20px;
+          padding: 16px 18px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
-          background: var(--color-background-tertiary);
+          gap: 2px;
+          scroll-behavior: auto;
+          background: var(--bg);
         }
-        .message-row {
+
+        .chat-fs-messages::-webkit-scrollbar { width: 4px; }
+        .chat-fs-messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+        .msg-group {
+          display: flex;
+          flex-direction: column;
+          margin-bottom: 12px;
+        }
+
+        .msg-group.out { align-items: flex-end; }
+        .msg-group.in { align-items: flex-start; }
+
+        .msg-sender {
+          font-size: 12px;
+          color: var(--text2);
+          margin-bottom: 4px;
+          padding-left: 48px;
+        }
+
+        .msg-row {
           display: flex;
           align-items: flex-end;
           gap: 8px;
-          max-width: 65%;
+          max-width: 70%;
         }
-        .message-row.me {
-          align-self: flex-end;
-          flex-direction: row-reverse;
-        }
-        .message-row.them {
-          align-self: flex-start;
-        }
-        .message-avatar {
-          width: 24px;
-          height: 24px;
+
+        .msg-group.out .msg-row { flex-direction: row-reverse; }
+
+        /* Message avatar — small circle with initials */
+        .msg-avatar {
+          width: 32px;
+          height: 32px;
+          min-width: 32px;
           border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 700;
+          color: #fff;
           overflow: hidden;
           flex-shrink: 0;
-          border: 0.5px solid var(--color-border-tertiary);
+          position: relative;
         }
-        .message-avatar img {
+
+        .msg-avatar img {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          border-radius: 50%;
         }
-        .message-bubble {
-          padding: 10px 14px;
-          border-radius: 14px;
-          font-size: 12px;
-          line-height: 1.4;
+
+        .msg-avatar .msg-status-dot {
+          position: absolute;
+          bottom: -1px;
+          left: -1px;
+          width: 9px;
+          height: 9px;
+          border-radius: 50%;
+          background: #ef4444;
+          border: 2px solid var(--bg);
+        }
+
+        /* ── Bubbles ── */
+        .msg-bubble {
+          padding: 8px 14px;
+          font-size: 14px;
+          line-height: 1.45;
           position: relative;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          cursor: default;
+          word-break: break-word;
+          max-width: 100%;
         }
-        .message-row.me .message-bubble {
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+
+        .msg-bubble:hover { opacity: 0.92; }
+
+        .msg-group.out .msg-bubble {
+          background: #0f6633;
           color: #fff;
-          border-bottom-right-radius: 2px;
+          border-radius: 18px 18px 4px 18px;
         }
-        .message-row.them .message-bubble {
-          background: var(--color-background-primary);
-          color: var(--color-text-primary);
-          border-bottom-left-radius: 2px;
-          border: 0.5px solid var(--color-border-tertiary);
+
+        .msg-group.in .msg-bubble {
+          background: var(--bg3);
+          color: var(--text);
+          border-radius: 18px 18px 18px 4px;
         }
-        .message-sender-name {
-          font-size: 9px;
-          font-weight: 700;
-          margin-bottom: 2px;
-          opacity: 0.8;
+
+        .msg-bubble.shared-product {
+          padding: 0;
+          overflow: hidden;
+          min-width: 180px;
+          background: none;
+          border: none;
         }
-        .message-time {
-          font-size: 8px;
-          margin-top: 3px;
-          text-align: right;
-          opacity: 0.6;
+
+        .prod-share-card {
+          border-radius: 14px;
+          overflow: hidden;
+          background: var(--bg3);
+          border: 0.5px solid var(--border2);
         }
-        .chat-fs-footer {
-          padding: 12px 20px;
-          background: var(--color-background-primary);
-          border-top: 0.5px solid var(--color-border-tertiary);
-        }
-        .chat-fs-input-wrap {
+
+        .prod-share-img {
+          background: var(--green-dim);
+          height: 100px;
           display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 36px;
+          overflow: hidden;
+        }
+
+        .prod-share-img img { width: 100%; height: 100%; object-fit: cover; }
+
+        .prod-share-body { padding: 8px 10px; }
+
+        .prod-share-name {
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--text);
+        }
+
+        .prod-share-price {
+          font-size: 13px;
+          color: var(--green);
+          font-weight: 600;
+        }
+
+        /* ── Message meta (time + read indicator) ── */
+        .msg-meta {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          margin-top: 3px;
+          padding: 0 2px;
+        }
+
+        .msg-time {
+          font-size: 11px;
+          color: var(--text3);
+        }
+
+        .read-indicator {
+          display: inline-flex;
+          align-items: center;
+          color: var(--text3);
+        }
+
+        .read-indicator.read { color: var(--green); }
+
+        /* ── Reactions ── */
+        .reactions-row {
+          display: flex;
+          gap: 4px;
+          margin-top: 4px;
+          flex-wrap: wrap;
+        }
+
+        .reaction-pill {
+          background: var(--bg3);
+          border: 0.5px solid var(--border2);
+          border-radius: 20px;
+          padding: 2px 7px;
+          font-size: 12px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 3px;
+          transition: border-color .12s;
+        }
+
+        .reaction-pill:hover { border-color: var(--green); }
+
+        .reaction-pill.mine {
+          border-color: var(--green);
+          background: var(--green-dim);
+        }
+
+        .reaction-count { font-size: 11px; color: var(--text2); }
+
+        /* ── Date separator ── */
+        .date-sep {
+          text-align: center;
+          font-size: 11px;
+          color: var(--text3);
+          margin: 12px 0 8px;
+          display: flex;
+          align-items: center;
           gap: 10px;
-          background: var(--color-background-secondary);
-          border: 0.5px solid var(--color-border-tertiary);
-          border-radius: var(--border-radius-md);
-          padding: 4px 8px;
+        }
+
+        .date-sep::before, .date-sep::after {
+          content: '';
+          flex: 1;
+          height: 0.5px;
+          background: var(--border);
+        }
+
+        /* ── Typing indicator ── */
+        .typing-indicator {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 0;
+        }
+
+        .typing-dots {
+          display: flex;
+          gap: 3px;
           align-items: center;
         }
-        .chat-fs-input-wrap input {
+
+        .typing-dots span {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: var(--text3);
+          animation: bounce 1.2s infinite;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+          0%,60%,100%{transform:translateY(0)}
+          30%{transform:translateY(-4px)}
+        }
+
+        .typing-label {
+          font-size: 12px;
+          color: var(--text3);
+          font-style: italic;
+        }
+
+        /* ── Reply Preview ── */
+        .reply-preview {
+          margin: 0 12px 6px;
+          background: var(--bg3);
+          border-left: 2px solid var(--green);
+          border-radius: 6px;
+          padding: 6px 10px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 12px;
+          color: var(--text2);
+        }
+
+        .reply-preview button {
+          background: none;
+          border: none;
+          color: var(--text3);
+          cursor: pointer;
+        }
+
+        /* ── Input Area ── */
+        .input-area {
+          padding: 10px 18px 14px;
+          border-top: 0.5px solid var(--border);
+          background: var(--bg2);
+        }
+
+        .input-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: #161616;
+          border: 0.5px solid var(--border2);
+          border-radius: 20px;
+          padding: 8px 12px;
+          transition: border-color .2s;
+        }
+
+        .input-row:focus-within {
+          border-color: var(--green);
+        }
+
+        .msg-input {
           flex: 1;
           background: none;
           border: none;
           outline: none;
-          color: var(--color-text-primary);
-          font-size: 12px;
-          padding: 6px 0;
-          font-family: var(--font-sans);
+          color: var(--text);
+          font-size: 14px;
+          resize: none;
+          max-height: 80px;
+          line-height: 1.4;
+          padding: 4px 0;
+          font-family: inherit;
         }
-        .chat-fs-send-btn {
-          background: #1aad52;
-          color: #fff;
+
+        .msg-input::placeholder { color: var(--text3); }
+
+        .input-actions {
+          display: flex;
+          align-items: center;
+          gap: 2px;
+        }
+
+        .inp-btn {
+          background: none;
           border: none;
+          color: var(--text3);
+          cursor: pointer;
+          padding: 6px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          transition: color .12s;
+        }
+
+        .inp-btn:hover { color: var(--text2); }
+
+        .send-btn {
+          background: var(--green);
+          border: none;
+          cursor: pointer;
           width: 32px;
-          height: 32px;
-          border-radius: var(--border-radius-sm);
+          height: 18px;
+          border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          transition: background 0.15s;
+          flex-shrink: 0;
+          transition: background .12s, transform .1s;
         }
-        .chat-fs-send-btn:hover {
-          background: #158a42;
-        }
-        .typing-indicator {
-          font-size: 10px;
-          color: var(--color-text-tertiary);
-          padding: 0 4px 6px;
-        }
-        .shared-cart-card {
-          background: rgba(0, 0, 0, 0.2);
-          border: 1px solid var(--color-border-tertiary);
-          border-radius: var(--border-radius-md);
-          padding: 10px;
-          margin-top: 8px;
+
+        .send-btn:hover { background: var(--green-dark); }
+        .send-btn:active { transform: scale(0.92); }
+
+        /* ── Emoji picker ── */
+        .emoji-picker {
+          position: absolute;
+          bottom: 70px;
+          right: 12px;
+          background: var(--bg3);
+          border: 0.5px solid var(--border2);
+          border-radius: 12px;
+          padding: 8px;
           display: flex;
-          flex-direction: column;
           gap: 6px;
+          flex-wrap: wrap;
+          width: 200px;
+          z-index: 10;
         }
-        .shared-cart-title {
+
+        .epick-emoji {
+          cursor: pointer;
+          font-size: 20px;
+          padding: 4px;
+          border-radius: 6px;
+          transition: background .1s;
+        }
+
+        .epick-emoji:hover { background: var(--bg4); }
+
+        /* ── Share Panel ── */
+        .share-panel {
+          padding: 10px 14px;
+          background: var(--bg3);
+          border-bottom: 0.5px solid var(--border);
+        }
+
+        .share-panel-title {
           font-size: 10px;
-          font-weight: 700;
-          color: #1aad52;
-          text-transform: uppercase;
+          color: var(--text3);
+          margin-bottom: 8px;
+          font-weight: 600;
           letter-spacing: 0.05em;
         }
-        .shared-cart-item {
-          font-size: 11px;
-          color: var(--color-text-secondary);
+
+        .product-card-mini {
+          background: var(--bg4);
+          border: 0.5px solid var(--border2);
+          border-radius: 10px;
+          padding: 8px 10px;
           display: flex;
-          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          min-width: 180px;
+          cursor: pointer;
+          transition: border-color .12s;
         }
 
-        /* Mobile responsive adjustments */
-        .chat-fs-mobile-back {
-          display: none;
+        .product-card-mini:hover { border-color: var(--green); }
+
+        .product-thumb {
+          width: 36px;
+          height: 36px;
+          border-radius: 6px;
+          background: var(--green-dim);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          flex-shrink: 0;
         }
-        .mobile-tabs-nav {
-          display: none;
+
+        .product-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
+
+        .product-info { flex: 1; min-width: 0; }
+
+        .product-name {
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--text);
         }
+
+        .product-price {
+          font-size: 11px;
+          color: var(--green);
+        }
+
+        .product-share-btn {
+          font-size: 11px;
+          background: var(--green);
+          color: #000;
+          border: none;
+          border-radius: 6px;
+          padding: 4px 10px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        /* No conversation placeholder */
+        .no-conv {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: var(--text3);
+          gap: 12px;
+          background: var(--bg);
+        }
+
+        .no-conv svg { opacity: 0.3; }
+        .no-conv p { font-size: 13px; }
+
+        /* ── Mobile responsive ── */
+        .chat-fs-mobile-back { display: none; }
+
         @media (max-width: 768px) {
-          /* General layout */
-          .main {
-            grid-template-columns: 1fr !important;
-            padding: 8px;
-            gap: 12px;
-          }
-          .hero {
-            padding: 16px;
-          }
-          .hero-inner {
-            flex-direction: column;
-            gap: 12px;
-          }
-          .hero-user {
-            width: 100%;
-          }
-
-          /* Mobile tabs switcher */
-          .mobile-tabs-nav {
-            display: flex;
-            background: var(--color-background-primary);
-            border-bottom: 0.5px solid var(--color-border-tertiary);
-            padding: 4px;
-            margin: 12px 8px 4px;
-            border-radius: var(--border-radius-lg);
-            gap: 4px;
-          }
-          .mobile-tab-btn {
-            flex: 1;
-            padding: 8px;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--color-text-secondary);
-            border: none;
-            background: none;
-            cursor: pointer;
-            border-radius: var(--border-radius-md);
-            text-align: center;
-            transition: all 0.15s;
-          }
-          .mobile-tab-btn.active {
-            background: #1aad52;
-            color: #fff;
-          }
-
-          /* Column display toggling on mobile */
-          .col-left, .col-center, .col-right {
-            display: none !important;
-          }
-          .col-left.active-mobile, .col-center.active-mobile, .col-right.active-mobile {
-            display: flex !important;
-          }
-
-          /* Chat Overlay page */
           .chat-fullscreen-container {
-            margin: 8px;
-            height: calc(100vh - 120px);
-            border-radius: var(--border-radius-lg);
+            margin: 4px;
+            height: calc(100vh - 110px);
+            border-radius: 12px;
           }
           .chat-fs-sidebar {
             width: 100%;
             display: flex;
           }
-          .chat-fs-main {
-            display: none;
-          }
-          .chat-fullscreen-container.chat-selected .chat-fs-sidebar {
-            display: none;
-          }
+          .chat-fs-main { display: none; }
+          .chat-fullscreen-container.chat-selected .chat-fs-sidebar { display: none; }
           .chat-fullscreen-container.chat-selected .chat-fs-main {
             display: flex;
             width: 100%;
@@ -989,23 +1465,15 @@ const Social = () => {
             justify-content: center;
             background: none;
             border: none;
-            color: var(--color-text-primary);
+            color: var(--text);
             cursor: pointer;
-            padding: 8px 4px;
-            margin-right: 4px;
-            border-radius: var(--border-radius-sm);
+            padding: 6px;
+            border-radius: 50%;
           }
-          .chat-fs-messages {
-            padding: 12px;
-          }
-          .message-row {
-            max-width: 85%;
-          }
-          .chat-fs-actions .chat-fs-btn {
-            padding: 6px 8px;
-            font-size: 10px;
-          }
-        }
+          .chat-fs-messages { padding: 12px; }
+          .msg-row { max-width: 85%; }
+          .chat-fs-hdr-actions { display: none; }
+        } }
       `}</style>
 
       {/* ===== USER PROFILE OVERLAY ===== */}
@@ -1239,34 +1707,60 @@ const Social = () => {
           {/* Left Sidebar */}
           <div className="chat-fs-sidebar">
             <div className="chat-fs-sidebar-header">
-              <span className="chat-fs-sidebar-title">
-                <MessageSquare size={14} style={{ color: '#1aad52' }} /> Active Chats
-              </span>
-              <button className="chat-fs-back-btn" onClick={() => setActiveChat(null)}>
-                <ArrowLeft size={10} /> Back
+              <h2>Messages</h2>
+              <button className="chat-fs-icon-btn" style={{ border: '0.5px solid var(--border2)', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Plus size={12} />
               </button>
             </div>
+            <div className="chat-fs-search-bar">
+              <Search size={14} />
+              <input 
+                type="text" 
+                placeholder="Search chats..." 
+                value={chatSearchQuery}
+                onChange={(e) => setChatSearchQuery(e.target.value)}
+              />
+            </div>
             <div className="chat-fs-list">
-              {recentChatsList.map((chat, idx) => (
-                <div 
-                  key={idx}
-                  onClick={() => selectChat(chat.user, 'dm')}
-                  className={`chat-fs-item ${activeChat.id === chat.user._id ? 'active' : ''}`}
-                >
-                  <div className="relative flex-shrink-0">
-                    <div className="avatar sm">
-                      <img src={getUserAvatarUrl(chat.user)} alt={chat.user.full_name} />
+              {conversations
+                .filter(c => c.name?.toLowerCase().includes(chatSearchQuery.toLowerCase()))
+                .map((chat) => {
+                  const isActive = activeChat.id === chat.id && activeChat.type === chat.type;
+                  const isGroup = chat.type === 'group';
+                  return (
+                    <div 
+                      key={chat.id + '-' + chat.type}
+                      onClick={() => selectChat(chat.group || chat.user, chat.type)}
+                      className={`chat-fs-item ${isActive ? 'active' : ''}`}
+                    >
+                      {renderAvatar(
+                        isGroup ? chat.group : chat.user,
+                        40,
+                        isGroup,
+                        !isGroup && onlineStatusMap[chat.id] && <div className="status-dot online"></div>
+                      )}
+                      <div className="chat-fs-info">
+                        <div className="chat-fs-name">{chat.name}</div>
+                        <div className="chat-fs-preview">
+                          {chat.lastMessage ? (
+                            `${(chat.lastMessage.sender?._id || chat.lastMessage.sender?.id || chat.lastMessage.sender) === (currentUserData?._id || currentUserData?.id) ? 'You: ' : ''}${chat.lastMessage.content}`
+                          ) : (
+                            isGroup ? 'Group joined' : 'Start a conversation'
+                          )}
+                        </div>
+                      </div>
+                      {chat.lastMessage && (
+                        <div className="chat-fs-time">
+                          {new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
                     </div>
-                    {onlineStatusMap[chat.user._id] && <div className="online-dot" style={{ border: '2px solid var(--color-background-primary)' }}></div>}
-                  </div>
-                  <div className="chat-info">
-                    <div className="chat-name">{chat.user.full_name}</div>
-                    <div className="chat-preview">{chat.lastMessage?.content}</div>
-                  </div>
+                  );
+                })}
+              {conversations.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text3)', fontSize: '12px' }}>
+                  No active conversations found.
                 </div>
-              ))}
-              {recentChatsList.length === 0 && (
-                <p className="text-[10px] text-gray-500 text-center py-4">No active chats.</p>
               )}
             </div>
           </div>
@@ -1274,109 +1768,294 @@ const Social = () => {
           {/* Right Main Pane */}
           <div className="chat-fs-main">
             <div className="chat-fs-header">
-              <div className="chat-fs-user-info" onClick={() => openProfile(activeChat.id)}>
-                <button 
-                  className="chat-fs-mobile-back"
-                  onClick={(e) => { e.stopPropagation(); setMobileChatView('list'); }}
-                  aria-label="Back to active chats"
-                >
-                  <ArrowLeft size={16} />
-                </button>
-                <div className="relative flex-shrink-0">
-                  <div className="avatar sm">
-                    <img src={getUserAvatarUrl({ profile_pic: activeChat.profile_pic, username: activeChat.name, full_name: activeChat.name })} alt={activeChat.name} />
-                  </div>
-                  {onlineStatusMap[activeChat.id] && <div className="online-dot" style={{ border: '2px solid var(--color-background-primary)' }}></div>}
-                </div>
-                <div>
-                  <div className="chat-fs-username">{activeChat.name}</div>
-                  <div className={`chat-fs-status ${!onlineStatusMap[activeChat.id] ? 'offline' : ''}`}>
-                    {onlineStatusMap[activeChat.id] ? 'online' : 'offline'}
-                  </div>
+              <button 
+                className="chat-fs-mobile-back"
+                onClick={(e) => { e.stopPropagation(); setMobileChatView('list'); }}
+                aria-label="Back to conversations list"
+              >
+                <ArrowLeft size={16} />
+              </button>
+              <div onClick={() => activeChat.type === 'dm' && openProfile(activeChat.id)} style={{ cursor: activeChat.type === 'dm' ? 'pointer' : 'default', marginRight: '10px' }}>
+                {renderAvatar(
+                  activeChat.type === 'group' 
+                    ? { name: activeChat.name } 
+                    : { profile_pic: activeChat.profile_pic, username: activeChat.name, full_name: activeChat.name },
+                  40,
+                  activeChat.type === 'group',
+                  activeChat.type === 'dm' && onlineStatusMap[activeChat.id] && <div className="status-dot online"></div>
+                )}
+              </div>
+              <div className="chat-fs-header-info">
+                <div className="chat-fs-header-name">{activeChat.name}</div>
+                <div className={`chat-fs-header-status ${activeChat.type === 'dm' && !onlineStatusMap[activeChat.id] ? 'offline' : ''}`}>
+                  {activeChat.type === 'group' ? 'Group Chat' : (onlineStatusMap[activeChat.id] ? 'online' : 'offline')}
                 </div>
               </div>
 
-              <div className="chat-fs-actions">
-                <button 
-                  onClick={() => {
-                    handleSendMessage(null, {
-                      type: 'CART',
-                      payload: { cartItems: [] }
-                    });
-                    addToast('Cart shared to conversation!', 'success');
-                  }}
-                  className="chat-fs-btn chat-fs-btn-secondary"
-                  style={{ color: '#10b981' }}
-                >
-                  <Share2 size={12} /> Share Cart
-                </button>
-                <button className="chat-fs-btn chat-fs-btn-primary" onClick={() => openProfile(activeChat.id)}>
-                  View Profile
-                </button>
+              <div className="chat-fs-hdr-actions">
+                <div className="hdr-dot-btn"></div>
+                <div className="hdr-dot-btn"></div>
+                <div className="hdr-dot-btn"></div>
+                <div className="hdr-dot-btn"></div>
+                <div className="hdr-dot-btn"></div>
               </div>
             </div>
+
+            {/* Share Panel */}
+            {shareOpen && (
+              <div className="share-panel">
+                <div className="share-panel-title">SHARE FROM YOUR CART</div>
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                  {cartItems && cartItems.length > 0 ? (
+                    cartItems.map((cItem) => (
+                      <div key={cItem._id} className="product-card-mini" onClick={() => {
+                        handleSendMessage(null, {
+                          type: 'CART',
+                          payload: { cartItems: [cItem] }
+                        });
+                        addToast('Product shared!', 'success');
+                      }}>
+                        <div className="product-thumb">
+                          {cItem.product?.image ? <img src={cItem.product.image} alt={cItem.product.name} /> : '🛒'}
+                        </div>
+                        <div className="product-info">
+                          <div className="product-name truncate" style={{ maxWidth: '100px' }}>{cItem.product?.name}</div>
+                          <div className="product-price">₹{cItem.product?.price}</div>
+                        </div>
+                        <button className="product-share-btn">Share</button>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ padding: '8px', color: 'var(--text3)', fontSize: '11px' }}>
+                      Your cart is empty. Add products to cart to share them.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Messages Area */}
             <div className="chat-fs-messages">
               {chatMessages.map((msg, index) => {
-                const isMe = msg.sender._id?.toString() === currentUserData?._id?.toString() || msg.sender === currentUserData?._id;
+                const msgSenderId = msg.sender?.id || msg.sender?._id || msg.sender;
+                const currentUserId = currentUserData?.id || currentUserData?._id || currentUserData;
+                const isMe = msgSenderId && currentUserId && msgSenderId.toString() === currentUserId.toString();
                 const senderUserObj = isMe ? currentUserData : msg.sender;
                 
+                // Group messages by date
+                const msgDate = new Date(msg.createdAt).toDateString();
+                const prevMsgDate = index > 0 ? new Date(chatMessages[index - 1].createdAt).toDateString() : null;
+                const showDateSeparator = msgDate !== prevMsgDate;
+
+                // Reaction helper
+                const hasReactions = msg.reactions && Object.keys(msg.reactions).length > 0;
+
                 return (
-                  <div key={index} className={`message-row ${isMe ? 'me' : 'them'}`}>
-                    <div className="message-avatar">
-                      <img src={getUserAvatarUrl(senderUserObj)} alt={senderUserObj?.full_name || 'user'} />
-                    </div>
-                    <div className="message-bubble">
-                      {!isMe && <div className="message-sender-name">{senderUserObj?.full_name}</div>}
-                      <div>{msg.content}</div>
-                      
-                      {/* Shared cart preview */}
-                      {msg.message_type === 'CART' && msg.metadata?.cartItems && (
-                        <div className="shared-cart-card">
-                          <div className="shared-cart-title">🛒 Shared Shopping Cart</div>
-                          {msg.metadata.cartItems.map((item, cIdx) => (
-                            <div key={cIdx} className="shared-cart-item">
-                              <span>{item.product?.name || 'Product'} (x{item.quantity})</span>
-                              <span className="text-emerald-400">${item.product?.price}</span>
-                            </div>
-                          ))}
-                          <button 
-                            onClick={() => handleCloneCart(msg.metadata.cartItems)}
-                            style={{ width: '100%', marginTop: 8, background: '#1aad52', border: 'none', borderRadius: 6, color: '#fff', fontSize: 10, fontWeight: 700, padding: '4px 8px', cursor: 'pointer' }}
-                          >
-                            Copy to My Cart
-                          </button>
-                        </div>
+                  <React.Fragment key={msg._id || index}>
+                    {showDateSeparator && (
+                      <div className="date-sep">
+                        {new Date(msg.createdAt).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
+                      </div>
+                    )}
+                    
+                    <div className={`msg-group ${isMe ? 'out' : 'in'}`}>
+                      {!isMe && (
+                        <div className="msg-sender">{senderUserObj?.full_name || 'Member'}</div>
                       )}
-                      
-                      <div className="message-time">
-                        {new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <div className="msg-row">
+                        {!isMe && (
+                          <div onClick={() => openProfile(senderUserObj?._id)} style={{ cursor: 'pointer', marginRight: '4px' }}>
+                            {renderAvatar(
+                              senderUserObj,
+                              28,
+                              false,
+                              <div className="msg-status-dot" style={{ backgroundColor: onlineStatusMap[senderUserObj?._id] ? 'var(--green)' : '#ef4444' }}></div>
+                            )}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                          
+                          {/* Thread Reply Reference */}
+                          {msg.replyTo && (
+                            <div className="reply-preview" style={{ margin: '0 0 4px', borderLeft: '2px solid var(--green)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', background: 'rgba(255,255,255,0.03)' }}>
+                              <span style={{ fontWeight: 600, color: 'var(--green)' }}>
+                                Replying to {(msg.replyTo.sender?._id || msg.replyTo.sender?.id || msg.replyTo.sender) === (currentUserData?._id || currentUserData?.id) ? 'you' : (msg.replyTo.sender?.full_name || 'user')}
+                              </span>
+                              <div className="truncate" style={{ maxWidth: '200px', opacity: 0.7 }}>
+                                {msg.replyTo.content}
+                              </div>
+                            </div>
+                          )}
+
+                          <div 
+                            className={`msg-bubble ${msg.message_type === 'PRODUCT' ? 'shared-product' : ''}`}
+                            onDoubleClick={() => toggleReaction(msg._id, '❤️')}
+                          >
+                            {/* Message Actions Popup on Hover / Quick reaction bar */}
+                            <div style={{ display: 'none' }}>Hover actions placeholder</div>
+
+                            {/* Render content based on messageType */}
+                            {msg.message_type === 'PRODUCT' && msg.metadata?.productId ? (
+                              <div className="prod-share-card">
+                                <div className="prod-share-img">
+                                  {msg.metadata.productId.user_file ? (
+                                    <img src={msg.metadata.productId.user_file} alt={msg.metadata.productId.name} />
+                                  ) : '🎁'}
+                                </div>
+                                <div className="prod-share-body">
+                                  <div className="prod-share-name">{msg.metadata.productId.name}</div>
+                                  <div className="prod-share-price">₹{msg.metadata.productId.price}</div>
+                                  <button
+                                    onClick={() => {
+                                      api.post(`/cart/add/${msg.metadata.productId._id}`, { quantity: 1 }, token);
+                                      addToast('Added to cart!', 'success');
+                                      refreshCart();
+                                    }}
+                                    className="product-share-btn"
+                                    style={{ width: '100%', marginTop: 8 }}
+                                  >
+                                    Add to Cart
+                                  </button>
+                                </div>
+                              </div>
+                            ) : msg.message_type === 'CART' && msg.metadata?.cartItems ? (
+                              <div className="prod-share-card" style={{ padding: '10px', minWidth: '200px' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--green)', marginBottom: '6px' }}>🛒 Shared Cart</div>
+                                {msg.metadata.cartItems.map((item, cIdx) => (
+                                  <div key={cIdx} style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                                    <span className="truncate" style={{ maxWidth: '130px' }}>{item.product?.name} (x{item.quantity})</span>
+                                    <span>₹{item.product?.price}</span>
+                                  </div>
+                                ))}
+                                <button 
+                                  onClick={() => handleCloneCart(msg.metadata.cartItems)}
+                                  className="product-share-btn"
+                                  style={{ width: '100%', marginTop: 8 }}
+                                >
+                                  Copy to My Cart
+                                </button>
+                              </div>
+                            ) : (
+                              msg.content
+                            )}
+
+                            {/* Quick emoji reaction floating bar */}
+                            <div className="msg-hover-actions" style={{ position: 'absolute', right: isMe ? 'auto' : '-90px', left: isMe ? '-90px' : 'auto', top: '-12px', background: 'var(--bg3)', border: '0.5px solid var(--border2)', borderRadius: '16px', padding: '2px 6px', display: 'none', gap: '4px', zIndex: 5 }}>
+                              <button onClick={() => toggleReaction(msg._id, '👍')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px' }}>👍</button>
+                              <button onClick={() => toggleReaction(msg._id, '❤️')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px' }}>❤️</button>
+                              <button onClick={() => setReplyTo(msg)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px', color: 'var(--text2)', padding: '0 2px' }}>Reply</button>
+                            </div>
+                            <style>{`
+                              .msg-row:hover .msg-hover-actions {
+                                  display: flex !important;
+                              }
+                            `}</style>
+                          </div>
+
+                          <div className="msg-meta">
+                            {!isMe && (
+                              <span style={{ color: onlineStatusMap[senderUserObj?._id] ? 'var(--green)' : '#ef4444', marginRight: '4px', fontSize: '8px', display: 'inline-block', transform: 'translateY(-1px)' }}>⚫</span>
+                            )}
+                            <div className="msg-time">
+                              {new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            {isMe && (
+                              <div className="msg-ticks" style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '4px' }}>
+                                {msg.is_read ? (
+                                  <span style={{ display: 'inline-flex', color: 'var(--green)' }}>
+                                    <Check size={11} style={{ marginRight: '-5px' }} />
+                                    <Check size={11} />
+                                  </span>
+                                ) : (
+                                  onlineStatusMap[activeChat?.id] ? (
+                                    <span style={{ display: 'inline-flex', color: '#666' }}>
+                                      <Check size={11} style={{ marginRight: '-5px' }} />
+                                      <Check size={11} />
+                                    </span>
+                                  ) : (
+                                    <span style={{ display: 'inline-flex', color: '#666' }}>
+                                      <Check size={11} />
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Reaction row */}
+                          {hasReactions && (
+                            <div className="reactions-row">
+                              {Object.entries(msg.reactions).map(([emoji, users]) => {
+                                if (!users || users.length === 0) return null;
+                                const isMine = users.includes(currentUserData?._id) || users.includes(currentUserData?.id);
+                                return (
+                                  <div 
+                                    key={emoji} 
+                                    className={`reaction-pill ${isMine ? 'mine' : ''}`}
+                                    onClick={() => toggleReaction(msg._id, emoji)}
+                                  >
+                                    <span>{emoji}</span>
+                                    <span className="reaction-count">{users.length}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </React.Fragment>
                 );
               })}
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input Bar */}
-            <div className="chat-fs-footer">
+            {/* Footer / Input Bar */}
+            <div className="input-area">
               {typingUsers.size > 0 && (
-                <div className="typing-indicator">
-                  {Array.from(typingUsers).join(', ')} is typing...
+                <div className="typing-indicator" style={{ marginBottom: '6px' }}>
+                  <div className="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <span className="typing-label">{Array.from(typingUsers).join(', ')} typing...</span>
                 </div>
               )}
-              <form onSubmit={handleSendMessage} className="chat-fs-input-wrap">
-                <input
-                  type="text"
+
+              {/* Reply Reference Preview */}
+              {replyTo && (
+                <div className="reply-preview">
+                  <div>
+                    Replying to <span style={{ fontWeight: 600, color: 'var(--green)' }}>{replyTo.sender?.full_name || 'user'}</span>
+                    <div style={{ fontSize: '11px', opacity: 0.8 }} className="truncate">{replyTo.content}</div>
+                  </div>
+                  <button onClick={() => setReplyTo(null)}>
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={handleSendMessage} className="input-row">
+                <textarea
+                  className="msg-input"
                   placeholder="Write a message..."
                   value={chatInput}
                   onChange={handleTyping}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage(e);
+                    }
+                  }}
+                  rows={1}
                 />
-                <button type="submit" className="chat-fs-send-btn">
-                  <Send size={14} />
-                </button>
+
+                <div className="input-actions">
+                  <button type="submit" className="send-btn" aria-label="Send">
+                  </button>
+                </div>
               </form>
             </div>
           </div>

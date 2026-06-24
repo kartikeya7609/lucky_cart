@@ -64,21 +64,37 @@ export const setupSocket = (server, allowedOrigins) => {
     // Direct Message Handler
     socket.on('send_dm', async (data) => {
       try {
-        const { recipientId, content, messageType, metadata } = data;
+        const { recipientId, content, messageType, metadata, replyTo } = data;
         if (!recipientId || !content) return;
+
+        // Check if recipient is online and has this sender's chat active
+        const recipientSocketId = onlineUsers.get(recipientId);
+        let isRead = false;
+        if (recipientSocketId) {
+          const recipientSocket = io.sockets.sockets.get(recipientSocketId);
+          if (recipientSocket && recipientSocket.activeChatId === userId) {
+            isRead = true;
+          }
+        }
 
         const message = await Message.create({
           sender: socket.user._id,
           recipient: recipientId,
           message_type: messageType || 'TEXT',
           content,
-          metadata
+          metadata,
+          replyTo: replyTo || null,
+          is_read: isRead
         });
 
         const populatedMessage = await Message.findById(message._id)
           .populate('sender', 'username full_name profile_pic')
           .populate('recipient', 'username full_name profile_pic')
-          .populate('metadata.productId', 'name price user_file description');
+          .populate('metadata.productId', 'name price user_file description')
+          .populate({
+            path: 'replyTo',
+            populate: { path: 'sender', select: 'username full_name' }
+          });
 
         // Emit to recipient and sender (all active tabs)
         io.to(recipientId).to(userId).emit('receive_dm', populatedMessage);
@@ -90,7 +106,7 @@ export const setupSocket = (server, allowedOrigins) => {
     // Group Message Handler
     socket.on('send_group_msg', async (data) => {
       try {
-        const { groupId, content, messageType, metadata } = data;
+        const { groupId, content, messageType, metadata, replyTo } = data;
         if (!groupId || !content) return;
 
         const message = await Message.create({
@@ -98,12 +114,17 @@ export const setupSocket = (server, allowedOrigins) => {
           group: groupId,
           message_type: messageType || 'TEXT',
           content,
-          metadata
+          metadata,
+          replyTo: replyTo || null
         });
 
         const populatedMessage = await Message.findById(message._id)
           .populate('sender', 'username full_name profile_pic')
-          .populate('metadata.productId', 'name price user_file description');
+          .populate('metadata.productId', 'name price user_file description')
+          .populate({
+            path: 'replyTo',
+            populate: { path: 'sender', select: 'username full_name' }
+          });
 
         // Emit to group room
         io.to(`group_${groupId}`).emit('receive_group_msg', { groupId, message: populatedMessage });
@@ -140,6 +161,80 @@ export const setupSocket = (server, allowedOrigins) => {
         statusMap[id] = onlineUsers.has(id.toString()) ? 'online' : 'offline';
       });
       socket.emit('online_status_response', statusMap);
+    });
+
+    // Toggle message reaction
+    socket.on('toggle_reaction', async (data) => {
+      try {
+        const { messageId, emoji } = data;
+        if (!messageId || !emoji) return;
+
+        const message = await Message.findById(messageId);
+        if (!message) return;
+
+        if (!message.reactions) {
+          message.reactions = new Map();
+        }
+
+        let usersList = message.reactions.get(emoji) || [];
+        const userIndex = usersList.indexOf(userId);
+
+        if (userIndex > -1) {
+          usersList.splice(userIndex, 1);
+        } else {
+          usersList.push(userId);
+        }
+
+        if (usersList.length === 0) {
+          message.reactions.delete(emoji);
+        } else {
+          message.reactions.set(emoji, usersList);
+        }
+
+        message.markModified('reactions');
+        await message.save();
+
+        const updatedMsg = await Message.findById(messageId)
+          .populate('sender', 'username full_name profile_pic')
+          .populate('recipient', 'username full_name profile_pic')
+          .populate('metadata.productId', 'name price user_file description')
+          .populate({
+            path: 'replyTo',
+            populate: { path: 'sender', select: 'username full_name' }
+          });
+
+        if (message.group) {
+          io.to(`group_${message.group.toString()}`).emit('message_reaction_updated', { messageId, message: updatedMsg });
+        } else {
+          io.to(message.sender.toString()).to(message.recipient.toString()).emit('message_reaction_updated', { messageId, message: updatedMsg });
+        }
+      } catch (err) {
+        socket.emit('error_message', { message: err.message });
+      }
+    });
+
+    // Track currently active chat target for real-time double ticks
+    socket.on('set_active_chat', (data) => {
+      const { chatId } = data;
+      socket.activeChatId = chatId ? chatId.toString() : null;
+    });
+
+    // Mark messages read handler
+    socket.on('mark_messages_read', async (data) => {
+      try {
+        const { senderId } = data;
+        if (!senderId) return;
+
+        await Message.updateMany(
+          { sender: senderId, recipient: userId, is_read: false },
+          { $set: { is_read: true } }
+        );
+
+        // Emit message read notification back to sender
+        io.to(senderId).emit('messages_read_by_recipient', { readerId: userId });
+      } catch (err) {
+        console.error('Error marking messages read:', err.message);
+      }
     });
 
     // Disconnect handler

@@ -23,7 +23,8 @@ import {
   getGroupChatMessages,
   getChatConversations,
   getFollowers,
-  getFollowing
+  getFollowing,
+  getJoinedGroups
 } from '../controllers/socialController.js';
 import { protect } from '../middleware/auth.js';
 
@@ -45,6 +46,7 @@ router.put('/privacy', protect, togglePrivacy);
 
 // Group management routes
 router.post('/groups', protect, createGroup);
+router.get('/groups/joined', protect, getJoinedGroups);
 router.post('/groups/:groupId/join', protect, joinGroup);
 router.post('/groups/:groupId/leave', protect, leaveGroup);
 router.get('/groups/:groupId', protect, getGroupDetails);
