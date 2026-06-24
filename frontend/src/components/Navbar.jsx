@@ -288,7 +288,7 @@ const Navbar = () => {
 
                 {/* Dropdown Panel */}
                 {showNotifPanel && (
-                  <div className="absolute right-0 top-12 w-80 max-h-[420px] overflow-y-auto bg-[#16191D] border border-white/10 rounded-2xl shadow-2xl shadow-black/50 z-[200]">
+                  <div className="fixed top-16 right-4 left-4 sm:absolute sm:top-12 sm:right-0 sm:left-auto w-auto sm:w-80 max-h-[70vh] sm:max-h-[420px] overflow-y-auto bg-[#16191D] border border-white/10 rounded-2xl shadow-2xl shadow-black/50 z-[200]">
                     {/* Header */}
                     <div className="sticky top-0 bg-[#16191D] px-4 py-3 border-b border-white/5 flex items-center justify-between">
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Notifications</span>
