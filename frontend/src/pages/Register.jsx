@@ -45,8 +45,8 @@ const Register = () => {
     setShowResend(false);
     setRemainingTime(300);
 
-    emailjs.init({ publicKey: "x5ns0x845LwLgna6x" });
-    emailjs.send('service_mdjy4m6', 'template_xfhx27s', {
+    emailjs.init({ publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY });
+    emailjs.send(import.meta.env.VITE_EMAILJS_SERVICE_ID, import.meta.env.VITE_EMAILJS_TEMPLATE_ID, {
       to_email: email,
       to_name: fullName || 'User',
       otp_code: otp,
