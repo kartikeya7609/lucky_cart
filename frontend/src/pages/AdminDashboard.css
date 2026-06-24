@@ -45,6 +45,8 @@
 .admin-dashboard .topbar-btn svg { font-size: 15px; width: 15px; height: 15px; }
 .admin-dashboard .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--color-background-info); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--color-text-info); cursor: pointer; }
 .admin-dashboard .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.admin-dashboard .metrics.metrics-4 { grid-template-columns: repeat(4, 1fr); }
+.admin-dashboard .metrics.metrics-6 { grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 18px; }
 .admin-dashboard .metric-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px; }
 .admin-dashboard .metric-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
 .admin-dashboard .metric-label svg { font-size: 14px; width: 14px; height: 14px; }
@@ -185,23 +187,69 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Generic button class used in products topbar */
+.admin-dashboard .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+.admin-dashboard .btn:hover {
+  background: var(--color-background-secondary);
+}
+
+/* ===== TABLET (≤992px) ===== */
 @media (max-width: 992px) {
   .admin-dashboard .metrics {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .admin-dashboard .metrics.metrics-6 {
+    grid-template-columns: repeat(3, 1fr) !important;
   }
   .admin-dashboard .row2,
   .admin-dashboard .row3 {
     grid-template-columns: 1fr;
   }
+  /* Products topbar: stack title and actions */
+  .admin-dashboard .topbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .admin-dashboard .topbar-actions {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+  }
+  /* Toolbar: wrap filters */
+  .admin-dashboard .toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .admin-dashboard .search-wrap {
+    min-width: 100% !important;
+  }
+  .admin-dashboard select.toolbar-select {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
+/* ===== MOBILE (≤768px) ===== */
 @media (max-width: 768px) {
   .admin-dashboard .shell {
     flex-direction: column;
     height: auto;
     min-height: 100vh;
   }
-  
+
+  /* Mobile top header */
   .admin-dashboard .mobile-header {
     display: flex;
     align-items: center;
@@ -213,7 +261,6 @@
     top: 0;
     z-index: 50;
   }
-  
   .admin-dashboard .menu-toggle-btn {
     background: none;
     border: none;
@@ -224,7 +271,6 @@
     justify-content: center;
     padding: 4px;
   }
-  
   .admin-dashboard .mobile-logo {
     font-size: 15px;
     font-weight: 500;
@@ -233,7 +279,6 @@
     align-items: center;
     gap: 6px;
   }
-  
   .admin-dashboard .mobile-avatar {
     width: 28px;
     height: 28px;
@@ -247,22 +292,21 @@
     color: var(--color-text-info);
   }
 
+  /* Sidebar: off-canvas drawer */
   .admin-dashboard .sidebar {
     position: fixed;
-    left: -240px;
+    left: -260px;
     top: 0;
     bottom: 0;
-    width: 240px;
+    width: 260px;
     z-index: 1000;
     transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     height: 100vh;
     box-shadow: 5px 0 25px rgba(0, 0, 0, 0.7);
   }
-  
   .admin-dashboard .sidebar.open {
     left: 0;
   }
-  
   .admin-dashboard .sidebar-close-btn {
     display: flex;
     align-items: center;
@@ -274,7 +318,6 @@
     padding: 4px;
     margin-left: auto;
   }
-  
   .admin-dashboard .sidebar-overlay {
     position: fixed;
     inset: 0;
@@ -282,40 +325,222 @@
     z-index: 999;
     backdrop-filter: blur(2px);
   }
-  
+
+  /* Main content area */
   .admin-dashboard .main {
-    padding: 16px;
+    padding: 14px;
     width: 100%;
   }
-  
+
+  /* Topbar */
   .admin-dashboard .topbar {
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 10px;
   }
-  
   .admin-dashboard .topbar-right {
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
   }
-  
+  /* Hide desktop avatar in topbar on mobile */
+  .admin-dashboard .topbar-right .avatar {
+    display: none;
+  }
+
+  /* Metrics: 2 columns on tablet-ish mobile */
+  .admin-dashboard .metrics {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Product detail drawer: full width */
   .admin-dashboard .drawer {
     width: 100%;
     max-width: 100vw;
   }
+
+  /* Toolbar: stack vertically */
+  .admin-dashboard .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-dashboard .search-wrap {
+    min-width: 0 !important;
+    width: 100%;
+  }
+  .admin-dashboard .toolbar select.toolbar-select {
+    width: 100%;
+  }
+
+  /* Pagination: compact */
+  .admin-dashboard .pagination {
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    text-align: center;
+    font-size: 11px;
+  }
+
+  /* Grid view: 2 columns */
+  #grid-inner {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Settings form stacking */
+  .admin-dashboard form .row2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Product topbar actions: wrap */
+  .admin-dashboard .topbar-actions {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .admin-dashboard .topbar-actions .btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
 }
 
+/* ===== SMALL MOBILE (≤576px) ===== */
 @media (max-width: 576px) {
+  .admin-dashboard .main {
+    padding: 10px;
+  }
+
+  /* Metrics: single column */
   .admin-dashboard .metrics {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
   }
-  
-  .admin-dashboard .topbar-right {
-    flex-wrap: wrap;
+  /* Compact metric cards */
+  .admin-dashboard .metric-card {
+    padding: 10px 12px !important;
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
-  
+  .admin-dashboard .metric-card .metric-label {
+    margin-bottom: 0;
+    flex: 1;
+  }
+  .admin-dashboard .metric-card .metric-value {
+    font-size: 18px !important;
+  }
+  .admin-dashboard .metric-card .metric-delta {
+    display: none;
+  }
+
+  /* Topbar buttons: full width */
   .admin-dashboard .topbar-btn {
     flex: 1;
     justify-content: center;
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+
+  /* Page title smaller */
+  .admin-dashboard .page-title {
+    font-size: 16px !important;
+  }
+
+  /* Grid view: single column */
+  #grid-inner {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Pagination: hide page number buttons, show only prev/next */
+  .admin-dashboard .page-btns .page-btn:not(:first-child):not(:last-child) {
+    display: none;
+  }
+  .admin-dashboard .page-btns .page-btn.active {
+    display: inline-flex;
+  }
+
+  /* Donut chart: scale down */
+  .admin-dashboard .donut-wrap {
+    height: 130px !important;
+  }
+  .admin-dashboard .donut-wrap canvas {
+    width: 130px !important;
+    height: 130px !important;
+  }
+
+  /* Legend: wrap tighter */
+  .admin-dashboard .legend-row {
+    justify-content: center;
+    gap: 6px;
+    font-size: 10px;
+  }
+
+  /* Cards: less padding */
+  .admin-dashboard .card {
+    padding: 12px;
+  }
+  .admin-dashboard .full-card {
+    padding: 12px;
+  }
+
+  /* Table text smaller */
+  .admin-dashboard table {
+    font-size: 11px;
+  }
+  .admin-dashboard th {
+    font-size: 9px;
+    padding: 0 4px 8px;
+  }
+  .admin-dashboard td {
+    padding: 8px 4px;
+  }
+  .admin-dashboard .tbl th {
+    padding: 8px 6px;
+    font-size: 9px;
+  }
+  .admin-dashboard .tbl td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  /* Search bar */
+  .admin-dashboard .search-bar {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  /* Action buttons smaller */
+  .admin-dashboard .act-btn {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+  .admin-dashboard .icon-btn {
+    width: 26px;
+    height: 26px;
+  }
+
+  /* Product topbar actions: stack fully */
+  .admin-dashboard .topbar-actions .btn {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  /* Drawer: tighter on small screens */
+  .admin-dashboard .drawer {
+    padding: 16px 14px;
+    gap: 12px;
+  }
+  .admin-dashboard .drawer-title {
+    font-size: 14px;
+    max-width: 220px !important;
+  }
+
+  /* Activity timeline: tighter */
+  .admin-dashboard .timeline {
+    padding-left: 18px !important;
   }
 }
+
 

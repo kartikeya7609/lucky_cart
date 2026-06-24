@@ -563,7 +563,7 @@ const AdminDashboard = () => {
                 <div className="page-title">Orders</div>
                 <div className="topbar-right"><div className="topbar-btn" onClick={handleExport}><Download /> Export CSV</div></div>
               </div>
-              <div className="metrics" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+              <div className="metrics metrics-4">
                 <div className="metric-card"><div className="metric-label">Pending</div><div className="metric-value" style={{ color: 'var(--color-text-warning)' }}>{pendingOrders}</div></div>
                 <div className="metric-card"><div className="metric-label">Processing</div><div className="metric-value" style={{ color: 'var(--color-text-info)' }}>{processingOrders}</div></div>
                 <div className="metric-card"><div className="metric-label">Delivered</div><div className="metric-value" style={{ color: 'var(--color-text-success)' }}>{deliveredOrders}</div></div>
@@ -631,7 +631,7 @@ const AdminDashboard = () => {
               </div>
 
               {/* Metrics */}
-              <div className="metrics" style={{ gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: 18 }}>
+              <div className="metrics metrics-6">
                 <div className="metric-card" style={{ padding: '10px 12px' }}>
                   <div className="metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em' }}><Package size={12} /> Total</div>
                   <div className="metric-value" style={{ fontSize: 18 }}>{products.length}</div>
@@ -904,7 +904,7 @@ const AdminDashboard = () => {
                 <div className="page-title">Customers</div>
                 <div className="topbar-right"><div className="topbar-btn" onClick={handleExport}><Download /> Export</div></div>
               </div>
-              <div className="metrics" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+              <div className="metrics metrics-4">
                 <div className="metric-card"><div className="metric-label">Total customers</div><div className="metric-value">{users.length}</div></div>
                 <div className="metric-card"><div className="metric-label">Buyers</div><div className="metric-value">{users.filter(u => u.role !== 'seller').length}</div></div>
                 <div className="metric-card"><div className="metric-label">Sellers</div><div className="metric-value">{users.filter(u => u.role === 'seller').length}</div></div>
@@ -979,7 +979,7 @@ const AdminDashboard = () => {
           {activeTab === 'reviews' && (
             <div className="page active">
               <div className="topbar"><div className="page-title">Reviews</div></div>
-              <div className="metrics" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+              <div className="metrics metrics-4">
                 <div className="metric-card"><div className="metric-label">Total reviews</div><div className="metric-value">{reviews.length}</div></div>
                 <div className="metric-card">
                   <div className="metric-label">Avg. rating</div>
