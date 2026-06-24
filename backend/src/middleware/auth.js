@@ -78,3 +78,6 @@ export const adminOnly = (req, res, next) => {
     res.status(403).json({ message: 'Access denied, admin role required' });
   }
 };
+
+export const verifyToken = protect;
+export const requireAdmin = adminOnly;

@@ -74,10 +74,17 @@ const authLimiter = rateLimit({
   message: { message: 'Too many authentication attempts, please try again after 15 minutes.' }
 });
 
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 tries
+  message: { message: 'Too many admin login attempts, please try again after 15 minutes.' }
+});
+
 // Apply rate limiters
 app.use('/api/', apiLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/admin-login', adminLoginLimiter);
 
 // Mount API Routes
 app.use('/api/auth', authRoutes);

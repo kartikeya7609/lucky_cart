@@ -110,7 +110,7 @@ export const getItemDetails = async (req, res) => {
 
     // Check if current user is a verified buyer
     let isVerifiedBuyer = false;
-    if (userId) {
+    if (userId && userId !== 'admin') {
       // Find orders completed by user
       const userOrders = await Order.find({ user: userId });
       const orderIds = userOrders.map(o => o._id);

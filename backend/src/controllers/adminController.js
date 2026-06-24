@@ -1,6 +1,123 @@
 import { Order, Item, User, Review } from '../models/index.js';
 
-// Get all orders on the platform (Admin dashboard)
+// Get all users on the platform (Admin dashboard)
+export const getAdminUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password_hash').sort({ createdAt: -1 });
+    res.status(200).json(users);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error retrieving admin users' });
+  }
+};
+
+// Get all products (Admin dashboard)
+export const getAdminProducts = async (req, res) => {
+  try {
+    const items = await Item.find().populate('seller', 'username');
+    res.status(200).json(items);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error retrieving admin products' });
+  }
+};
+
+// Get all reviews (Admin dashboard)
+export const getAdminReviews = async (req, res) => {
+  try {
+    const reviews = await Review.find()
+      .populate('user', 'username')
+      .populate('item', 'name')
+      .sort({ createdAt: -1 });
+    res.status(200).json(reviews);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error retrieving admin reviews' });
+  }
+};
+
+// Approve a review (Admin dashboard)
+export const approveReview = async (req, res) => {
+  try {
+    const review = await Review.findById(req.params.id);
+    if (!review) return res.status(404).json({ message: 'Review not found' });
+    review.is_verified = true;
+    await review.save();
+    res.status(200).json({ message: 'Review approved successfully', review });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error approving review' });
+  }
+};
+
+// Delete a review (Admin dashboard)
+export const adminDeleteReview = async (req, res) => {
+  try {
+    const review = await Review.findByIdAndDelete(req.params.id);
+    if (!review) return res.status(404).json({ message: 'Review not found' });
+    res.status(200).json({ message: 'Review deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error deleting review' });
+  }
+};
+
+// Get system activity logs (Admin dashboard)
+export const getAdminActivity = async (req, res) => {
+  try {
+    const [orders, users, items, reviews] = await Promise.all([
+      Order.find().populate('user', 'username').sort({ createdAt: -1 }).limit(10),
+      User.find().sort({ createdAt: -1 }).limit(10),
+      Item.find().populate('seller', 'username').sort({ createdAt: -1 }).limit(10),
+      Review.find().populate('user', 'username').populate('item', 'name').sort({ createdAt: -1 }).limit(10)
+    ]);
+
+    const activities = [];
+
+    orders.forEach(o => {
+      activities.push({
+        type: 'order',
+        title: `New order #LC-${o._id.toString().slice(-8).toUpperCase()} placed by ${o.user?.username || 'Guest'} — ₹${o.total_price.toLocaleString()}`,
+        time: o.createdAt || o.date_ordered,
+        user: o.user?.username || 'Guest'
+      });
+    });
+
+    users.forEach(u => {
+      activities.push({
+        type: 'user',
+        title: `New customer registered — ${u.email_address}`,
+        time: u.createdAt,
+        user: u.username
+      });
+    });
+
+    items.forEach(i => {
+      activities.push({
+        type: 'item',
+        title: `New product listed: ${i.name} — ₹${i.price.toLocaleString()}`,
+        time: i.createdAt,
+        user: i.seller?.username || 'Seller'
+      });
+    });
+
+    reviews.forEach(r => {
+      activities.push({
+        type: 'review',
+        title: `New ${r.rating}★ review on '${r.item?.name || 'Item'}' by ${r.user?.username || 'Guest'}`,
+        time: r.createdAt || r.date_posted,
+        user: r.user?.username || 'Guest'
+      });
+    });
+
+    activities.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+    res.status(200).json(activities.slice(0, 25));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error retrieving admin activities' });
+  }
+};// Get all orders on the platform (Admin dashboard)
 export const getAdminOrders = async (req, res) => {
   try {
     const orders = await Order.find()
@@ -121,5 +238,37 @@ export const exportDataCsv = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error exporting data CSV' });
+  }
+};
+
+// Update product stock
+export const updateAdminProductStock = async (req, res) => {
+  try {
+    const { stock } = req.body;
+    if (stock == null || isNaN(Number(stock)) || Number(stock) < 0) {
+      return res.status(400).json({ message: 'Valid stock number is required' });
+    }
+    const item = await Item.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: 'Product not found' });
+    item.stock = Number(stock);
+    await item.save();
+
+    const updatedItem = await Item.findById(req.params.id).populate('seller', 'username');
+    res.status(200).json({ message: 'Stock updated successfully', item: updatedItem });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error updating stock' });
+  }
+};
+
+// Delete a product
+export const deleteAdminProduct = async (req, res) => {
+  try {
+    const item = await Item.findByIdAndDelete(req.params.id);
+    if (!item) return res.status(404).json({ message: 'Product not found' });
+    res.status(200).json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error deleting product' });
   }
 };

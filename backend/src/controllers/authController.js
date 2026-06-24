@@ -348,3 +348,35 @@ export const updateMe = async (req, res) => {
     res.status(500).json({ message: 'Server error updating user profile' });
   }
 };
+
+// Admin Login
+export const adminLogin = async (req, res) => {
+  const { username, password } = req.body;
+
+  const envUsername = process.env.ADMIN_USERNAME || 'admin1234';
+  const envPassword = process.env.ADMIN_PASSWORD || 'admin';
+
+  if (username === envUsername && password === envPassword) {
+    const token = jwt.sign(
+      { id: 'admin', role: 'admin' },
+      process.env.JWT_SECRET || 'ec9439cfc6c796ae2029594d_jwt',
+      { expiresIn: '2h' }
+    );
+
+    res.cookie('access_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7200000 // 2 hours
+    });
+
+    return res.status(200).json({
+      token,
+      user: {
+        username: envUsername,
+        role: 'admin'
+      }
+    });
+  } else {
+    return res.status(401).json({ message: 'Invalid administrator credentials.' });
+  }
+};

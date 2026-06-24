@@ -48,9 +48,20 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   // Login handler
-  const login = async (username, password) => {
+  const login = async (usernameOrToken, passwordOrUser) => {
+    // If it's a token, store directly (for admin-login)
+    if (typeof usernameOrToken === 'string' && usernameOrToken.split('.').length === 3) {
+      const tokenVal = usernameOrToken;
+      const userVal = passwordOrUser;
+      localStorage.setItem('access_token', tokenVal);
+      setToken(tokenVal);
+      setUser(userVal);
+      addToast('Welcome, Administrator.', 'success');
+      return { success: true, isAdmin: true };
+    }
+
     try {
-      const data = await api.post('/auth/login', { username, password });
+      const data = await api.post('/auth/login', { username: usernameOrToken, password: passwordOrUser });
       
       if (data.isAdmin) {
         localStorage.setItem('access_token', data.accessToken);
