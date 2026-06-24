@@ -39,7 +39,6 @@ const Register = () => {
   const sendOtpEmail = (email) => {
     const otp = String(Math.floor(1000 + Math.random() * 9000));
     setGeneratedOtp(otp);
-    console.log('GENERATED OTP:', otp);
     setOtpVal(['', '', '', '']);
     setOtpStatus({ message: 'Sending verification OTP...', type: 'info' });
     setShowResend(false);
@@ -132,9 +131,6 @@ const Register = () => {
             state,
             zip_code: zipCode
           };
-
-          // Debug: log exactly what we're sending
-          console.log('Registration payload:', payload);
 
           const result = await register(payload);
           setSubmitting(false);
