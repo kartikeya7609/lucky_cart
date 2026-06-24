@@ -29,30 +29,30 @@ function App() {
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 lg:pb-8">
               <Routes>
-                
+                {/* Default routes */}
                 <Route path="/" element={<Navigate to="/market" replace />} />
                 <Route path="/market" element={<Marketplace />} />
                 <Route path="/item/:id" element={<ItemDetail />} />
 
-                
+                {/* Authentication routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
 
-                
+                {/* User routes */}
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/wishlist/public/:username" element={<PublicWishlist />} />
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/account" element={<Profile />} />
 
-                
+                {/* Seller routes */}
                 <Route path="/listings" element={<SellerPanel />} />
 
-                
+                {/* Admin routes */}
                 <Route path="/admin" element={<AdminLogin />} />
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
-                
+                {/* Receipt printable view */}
                 <Route path="/receipt/:id" element={<Receipt />} />
               </Routes>
             </main>
@@ -65,7 +65,7 @@ function App() {
   );
 }
 
-
+// Help component to hide navbar on the print receipt view
 const NavbarWithCondition = () => {
   const { pathname } = useLocation();
   const isReceiptPage = pathname.startsWith('/receipt');
@@ -73,7 +73,7 @@ const NavbarWithCondition = () => {
   return <Navbar />;
 };
 
-
+// Help component to hide footer on the print receipt view
 const FooterWithCondition = () => {
   const { pathname } = useLocation();
   const isReceiptPage = pathname.startsWith('/receipt');

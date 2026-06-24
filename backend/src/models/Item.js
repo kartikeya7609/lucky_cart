@@ -51,14 +51,14 @@ const itemSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-
+// Virtual for reviews
 itemSchema.virtual('reviews', {
   ref: 'Review',
   localField: '_id',
   foreignField: 'item'
 });
 
-
+// Virtual for average rating
 itemSchema.virtual('average_rating').get(function () {
   if (!this.reviews || this.reviews.length === 0) return 0;
   const sum = this.reviews.reduce((acc, rev) => acc + rev.rating, 0);

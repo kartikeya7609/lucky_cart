@@ -17,7 +17,7 @@ export const protect = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'ec9439cfc6c796ae2029594d_jwt');
     
-    
+    // Check if it's admin role decoded from admin login
     if (decoded.role === 'admin') {
       req.user = { id: 'admin', username: 'admin1234', role: 'admin' };
       return next();
@@ -56,7 +56,9 @@ export const optionalProtect = async (req, res, next) => {
       if (user) {
         req.user = user;
       }
-    } catch (error) 
+    } catch (error) {
+      // Fail silently for optional auth
+    }
   }
   next();
 };

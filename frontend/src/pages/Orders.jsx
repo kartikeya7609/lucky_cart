@@ -27,7 +27,7 @@ const Orders = () => {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [returnModal, setReturnModal] = useState(null); 
+  const [returnModal, setReturnModal] = useState(null); // { orderId, daysLeft }
   const [returnReason, setReturnReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -46,11 +46,11 @@ const Orders = () => {
 
   useEffect(() => { fetchOrders(); }, [token]);
 
-  
+  // ── Cancel ────────────────────────────────────────────────
   const handleCancelOrder = async (orderId) => {
     if (!window.confirm('Request a cancellation? The seller must approve before your refund is issued.')) return;
     try {
-      const res = await api.post(`/orders/cancel/${orderId}`, , token);
+      const res = await api.post(`/orders/cancel/${orderId}`, {}, token);
       addToast(res.message || 'Cancellation request submitted.', 'success');
       await fetchOrders();
     } catch (err) {
@@ -58,7 +58,7 @@ const Orders = () => {
     }
   };
 
-  
+  // ── Return ────────────────────────────────────────────────
   const openReturnModal = (order) => {
     const daysLeft = order.date_delivered
       ? Math.max(0, 7 - Math.floor((Date.now() - new Date(order.date_delivered).getTime()) / (1000 * 60 * 60 * 24)))
@@ -109,7 +109,7 @@ const Orders = () => {
             const isClosed = ['Cancelled', 'Rejected', 'Returned'].includes(order.status);
             const isPendingAction = ['CancellationRequested', 'ReturnRequested'].includes(order.status);
 
-            
+            // 7-day return eligibility
             const daysLeft = order.date_delivered
               ? Math.max(0, 7 - Math.floor((Date.now() - new Date(order.date_delivered).getTime()) / (1000 * 60 * 60 * 24)))
               : null;
@@ -118,7 +118,7 @@ const Orders = () => {
             return (
               <div key={order._id} className="bg-[#16191D] rounded-[2.5rem] border border-white/5 overflow-hidden shadow-2xl">
 
-                
+                {/* ── Order Header ── */}
                 <div className="p-8 border-b border-white/5 bg-white/[0.02] flex flex-wrap justify-between items-center gap-6">
                   <div>
                     <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Order Number</p>
@@ -137,14 +137,14 @@ const Orders = () => {
                     </p>
                   </div>
 
-                  
+                  {/* ── Action Controls ── */}
                   <div className="flex items-center gap-3 flex-wrap">
-                    
+                    {/* Status badge */}
                     <div className={`px-4 py-1.5 border rounded-full text-xs font-bold uppercase tracking-widest ${STATUS_COLORS[order.status] || 'text-blue-400 bg-blue-500/10 border-blue-500/20'}`}>
                       {STATUS_LABELS[order.status] || order.status}
                     </div>
 
-                    
+                    {/* Cancel button */}
                     {['Ordered', 'Accepted'].includes(order.status) && (
                       <button
                         onClick={() => handleCancelOrder(order._id)}
@@ -154,7 +154,7 @@ const Orders = () => {
                       </button>
                     )}
 
-                    
+                    {/* Return button — only within 7-day window */}
                     {canReturn && (
                       <button
                         onClick={() => openReturnModal(order)}
@@ -165,7 +165,7 @@ const Orders = () => {
                       </button>
                     )}
 
-                    
+                    {/* Return expired notice */}
                     {isDelivered && daysLeft === 0 && (
                       <div className="px-4 py-1.5 bg-gray-500/10 border border-gray-500/20 rounded-full">
                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Return Window Expired</span>
@@ -182,7 +182,7 @@ const Orders = () => {
                   </div>
                 </div>
 
-                
+                {/* ── Status Banner (for special statuses) ── */}
                 {isPendingAction && (
                   <div className={`px-8 py-4 border-b border-white/5 flex items-center gap-3 ${
                     order.status === 'ReturnRequested' ? 'bg-orange-500/5' : 'bg-amber-500/5'
@@ -219,7 +219,7 @@ const Orders = () => {
                   </div>
                 )}
 
-                
+                {/* ── Progress Tracker ── */}
                 {!isClosed && !isPendingAction && (
                   <div className="px-8 py-10 bg-black/20">
                     <div className="relative flex justify-between">
@@ -241,7 +241,7 @@ const Orders = () => {
                       })}
                     </div>
 
-                    
+                    {/* 7-day return countdown for delivered orders */}
                     {isDelivered && daysLeft !== null && daysLeft > 0 && (
                       <div className="mt-6 flex items-center gap-2 justify-center">
                         <Clock size={13} className="text-orange-400" />
@@ -253,7 +253,7 @@ const Orders = () => {
                   </div>
                 )}
 
-                
+                {/* ── Order Items ── */}
                 <div className="p-8 space-y-6">
                   {order.items?.map((order_item, oiIdx) => (
                     <div key={oiIdx} className="flex items-center gap-6 group">
@@ -291,7 +291,7 @@ const Orders = () => {
         </div>
       </div>
 
-      
+      {/* ── Return Modal ── */}
       {returnModal && (
         <div
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}

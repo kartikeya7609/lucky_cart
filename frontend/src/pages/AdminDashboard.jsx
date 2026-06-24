@@ -24,16 +24,16 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
-  
+  // Settings State
   const [storeName, setStoreName] = useState('Lucky Cart India');
   const [supportEmail, setSupportEmail] = useState('support@luckycart.in');
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
-  
+  // Search states
   const [orderQuery, setOrderQuery] = useState('');
   const [productQuery, setProductQuery] = useState('');
   
-  
+  // Scoped Product Page states
   const [viewMode, setViewMode] = useState('table');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -171,9 +171,9 @@ const AdminDashboard = () => {
 
   const handleApproveReview = async (id) => {
     try {
-      await api.put(`/admin/reviews/${id}/approve`, , token);
+      await api.put(`/admin/reviews/${id}/approve`, {}, token);
       addToast('Review approved!', 'success');
-      
+      // Refresh reviews
       const reviewsData = await api.get('/admin/reviews', token);
       setReviews(reviewsData || []);
     } catch (err) {
@@ -186,7 +186,7 @@ const AdminDashboard = () => {
     try {
       await api.delete(`/admin/reviews/${id}`, token);
       addToast('Review deleted!', 'success');
-      
+      // Refresh reviews
       const reviewsData = await api.get('/admin/reviews', token);
       setReviews(reviewsData || []);
     } catch (err) {
@@ -199,7 +199,7 @@ const AdminDashboard = () => {
     addToast('Settings saved successfully!', 'success');
   };
 
-  
+  // Product Page specific logic
   const getSoldQty = (prodId) => {
     let totalSold = 0;
     orders.forEach(o => {
@@ -235,7 +235,7 @@ const AdminDashboard = () => {
     try {
       await api.put(`/admin/products/${prodId}/stock`, { stock: val }, token);
       addToast('Stock updated successfully', 'success');
-      
+      // Refresh products list
       const productsData = await api.get('/admin/products', token);
       setProducts(productsData || []);
     } catch (err) {
@@ -251,7 +251,7 @@ const AdminDashboard = () => {
       if (selectedProductId === prodId) {
         setSelectedProductId(null);
       }
-      
+      // Refresh products list
       const productsData = await api.get('/admin/products', token);
       setProducts(productsData || []);
     } catch (err) {
@@ -259,7 +259,7 @@ const AdminDashboard = () => {
     }
   };
 
-  
+  // Bulk operations
   const toggleSelectAllProducts = (checked) => {
     if (checked) {
       setSelectedProducts(products.map(p => p._id));
@@ -283,7 +283,7 @@ const AdminDashboard = () => {
       await Promise.all(selectedProducts.map(id => api.delete(`/admin/products/${id}`, token)));
       addToast('Selected products deleted successfully', 'success');
       setSelectedProducts([]);
-      
+      // Refresh products list
       const productsData = await api.get('/admin/products', token);
       setProducts(productsData || []);
     } catch (err) {
@@ -340,7 +340,7 @@ const AdminDashboard = () => {
     { id: 'settings', icon: Settings, label: 'Settings' }
   ];
 
-  
+  // Stats derived
   const totalRevenue = orders.reduce((sum, o) => sum + (o.status !== 'Cancelled' ? o.total_price : 0), 0);
   const totalOrders = orders.length;
   const activeCustomers = users.length;
@@ -349,7 +349,7 @@ const AdminDashboard = () => {
   const processingOrders = orders.filter(o => o.status === 'Processing').length;
   const pendingOrders = totalOrders - deliveredOrders - cancelledOrders - processingOrders;
 
-  
+  // Filter lists
   const filteredOrders = orders.filter(o => {
     const q = orderQuery.toLowerCase();
     return o._id.toLowerCase().includes(q) || (o.user?.username || '').toLowerCase().includes(q);
@@ -456,7 +456,7 @@ const AdminDashboard = () => {
             <div className="mobile-logo"><ShoppingCart size={16} /> LuckyCart</div>
             <div className="mobile-avatar">AD</div>
           </div>
-          
+          {/* OVERVIEW PAGE */}
           {activeTab === 'overview' && (
             <div className="page active">
               <div className="topbar">
@@ -556,7 +556,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          
+          {/* ORDERS PAGE */}
           {activeTab === 'orders' && (
             <div className="page active">
               <div className="topbar">
@@ -605,7 +605,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          
+          {/* PRODUCTS PAGE */}
           {activeTab === 'products' && (
             <div className="page active">
               <div className="topbar">
@@ -630,7 +630,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              
+              {/* Metrics */}
               <div className="metrics" style={{ gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: 18 }}>
                 <div className="metric-card" style={{ padding: '10px 12px' }}>
                   <div className="metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em' }}><Package size={12} /> Total</div>
@@ -668,7 +668,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              
+              {/* Toolbar */}
               <div className="toolbar">
                 <div className="search-wrap">
                   <Search size={14} />
@@ -733,7 +733,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              
+              {/* Table / Grid view */}
               <div className="table-card">
                 {loading ? (
                   <p style={{ padding: 20 }}>Loading products...</p>
@@ -870,7 +870,7 @@ const AdminDashboard = () => {
                   </div>
                 )}
 
-                
+                {/* Pagination */}
                 <div className="pagination">
                   <span>
                     Showing {Math.min((productsPage - 1) * PER_PAGE + 1, totalProductsCount)}–{Math.min(productsPage * PER_PAGE, totalProductsCount)} of {totalProductsCount} products
@@ -897,7 +897,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          
+          {/* USERS PAGE */}
           {activeTab === 'users' && (
             <div className="page active">
               <div className="topbar">
@@ -949,7 +949,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          
+          {/* ANALYTICS PAGE */}
           {activeTab === 'analytics' && (
             <div className="page active">
               <div className="topbar">
@@ -975,7 +975,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          
+          {/* REVIEWS PAGE */}
           {activeTab === 'reviews' && (
             <div className="page active">
               <div className="topbar"><div className="page-title">Reviews</div></div>
@@ -1055,7 +1055,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          
+          {/* ACTIVITY PAGE */}
           {activeTab === 'activity' && (
             <div className="page active">
               <div className="topbar"><div className="page-title">Activity Log</div></div>
@@ -1090,7 +1090,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          
+          {/* SETTINGS PAGE */}
           {activeTab === 'settings' && (
             <div className="page active">
               <div className="topbar"><div className="page-title">Settings</div></div>
@@ -1143,7 +1143,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          
+          {/* PRODUCT DETAIL DRAWER */}
           {selectedProduct && (
             <div className="drawer-overlay" onClick={() => setSelectedProductId(null)}>
               <div className="drawer" onClick={(e) => e.stopPropagation()}>

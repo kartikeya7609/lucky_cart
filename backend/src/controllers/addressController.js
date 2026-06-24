@@ -1,6 +1,6 @@
 import { Address } from '../models/index.js';
 
-
+// Get user addresses
 export const getAddresses = async (req, res) => {
   const userId = req.user.id;
 
@@ -13,13 +13,13 @@ export const getAddresses = async (req, res) => {
   }
 };
 
-
+// Add Address
 export const addAddress = async (req, res) => {
   const userId = req.user.id;
   const { full_name, phone_number, address_line, city, state, zip_code, is_default } = req.body;
 
   try {
-    
+    // If setting as default, unset previous default addresses
     if (is_default) {
       await Address.updateMany({ user: userId }, { is_default: false });
     }
@@ -43,7 +43,7 @@ export const addAddress = async (req, res) => {
   }
 };
 
-
+// Set Default Address
 export const setDefaultAddress = async (req, res) => {
   const addressId = req.params.id;
   const userId = req.user.id;
@@ -66,7 +66,7 @@ export const setDefaultAddress = async (req, res) => {
   }
 };
 
-
+// Delete Address
 export const deleteAddress = async (req, res) => {
   const addressId = req.params.id;
   const userId = req.user.id;

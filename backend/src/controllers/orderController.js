@@ -1,7 +1,7 @@
 import { Order, OrderItem, Item, User, Address, Wishlist, WishlistItem, Notification, ViewedItem } from '../models/index.js';
 import mongoose from 'mongoose';
 
-
+// Get Current User Orders (consumer)
 export const getMyOrders = async (req, res) => {
   const userId = req.user.id;
 
@@ -21,22 +21,22 @@ export const getMyOrders = async (req, res) => {
   }
 };
 
-
+// Get Orders for Seller — returns all orders that contain this seller's items
 export const getSellerOrders = async (req, res) => {
   const sellerId = req.user.id;
 
   try {
-    
+    // Find all items owned by this seller
     const sellerItems = await Item.find({ seller: sellerId }).select('_id').lean();
     const sellerItemIds = sellerItems.map(i => i._id);
 
-    
+    // Find OrderItems referencing those items (no need to populate just to get order IDs)
     const orderItems = await OrderItem.find({ item: { $in: sellerItemIds } }).select('order').lean();
 
-    
+    // Get unique order IDs
     const orderIds = [...new Set(orderItems.map(oi => String(oi.order)))];
 
-    
+    // Fetch those full orders with buyer + address populated
     const orders = await Order.find({ _id: { $in: orderIds } })
       .populate('user', 'username email_address full_name phone_number')
       .populate('address')
@@ -47,7 +47,7 @@ export const getSellerOrders = async (req, res) => {
       .sort({ date_ordered: -1 })
       .lean();
 
-    
+    // Attach per-order seller-specific totals
     const enriched = orders.map(order => {
       const myItems = (order.items || []).filter(
         oi => oi.item && String(oi.item.seller) === String(sellerId)
@@ -70,7 +70,7 @@ export const getSellerOrders = async (req, res) => {
   }
 };
 
-
+// Get Receipt for a specific order
 export const getReceipt = async (req, res) => {
   const orderId = req.params.orderId;
   const userId = req.user.id;
@@ -88,7 +88,7 @@ export const getReceipt = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    
+    // Verify ownership
     if (String(order.user._id) !== String(userId)) {
       return res.status(403).json({ message: 'Unauthorized access to this receipt.' });
     }
@@ -100,7 +100,7 @@ export const getReceipt = async (req, res) => {
   }
 };
 
-
+// Cancel Order — Consumer requests cancellation; seller must approve before refund is issued
 export const cancelOrder = async (req, res) => {
   const orderId = req.params.orderId;
   const userId = req.user.id;
@@ -118,11 +118,11 @@ export const cancelOrder = async (req, res) => {
       return res.status(400).json({ message: 'Cannot cancel an order in its current status.' });
     }
 
-    
+    // Mark as cancellation requested — DO NOT refund yet
     order.status = 'CancellationRequested';
     await order.save();
 
-    
+    // Notify every unique seller whose item is in this order
     const notifiedSellers = new Set();
     for (const oi of order.items) {
       const sellerId = oi.item?.seller?._id || oi.item?.seller;
@@ -143,11 +143,11 @@ export const cancelOrder = async (req, res) => {
   }
 };
 
-
+// Respond to Cancellation — Seller accepts or rejects the buyer's cancellation request
 export const respondCancellation = async (req, res) => {
   const orderId = req.params.orderId;
   const sellerId = req.user.id;
-  const { action } = req.body; 
+  const { action } = req.body; // 'accept' | 'reject'
 
   if (!['accept', 'reject'].includes(action)) {
     return res.status(400).json({ message: 'Invalid action. Use "accept" or "reject".' });
@@ -161,7 +161,7 @@ export const respondCancellation = async (req, res) => {
       return res.status(400).json({ message: 'This order does not have a pending cancellation request.' });
     }
 
-    
+    // Verify this seller owns at least one item in the order
     const sellerItems = [];
     for (const oi of order.items) {
       const itemObj = await Item.findById(oi.item);
@@ -174,7 +174,7 @@ export const respondCancellation = async (req, res) => {
     }
 
     if (action === 'accept') {
-      
+      // ── Restore stock + deduct seller budget for seller's items ──
       for (const { oi, itemObj } of sellerItems) {
         itemObj.stock += oi.quantity;
         await itemObj.save();
@@ -186,7 +186,7 @@ export const respondCancellation = async (req, res) => {
         }
       }
 
-      
+      // ── Refund buyer immediately ──
       const buyer = await User.findById(order.user);
       if (buyer) {
         buyer.budget += order.total_price;
@@ -196,7 +196,7 @@ export const respondCancellation = async (req, res) => {
       order.status = 'Cancelled';
       await order.save();
 
-      
+      // Notify buyer
       const notif = new Notification({
         user: order.user,
         message: `✅ Your cancellation for Order #LC-${String(order._id).slice(-6)} was approved! ₹${order.total_price.toFixed(2)} has been refunded to your account.`
@@ -206,11 +206,11 @@ export const respondCancellation = async (req, res) => {
       res.status(200).json({ message: `Cancellation accepted. Buyer refunded ₹${order.total_price.toFixed(2)}.`, order });
 
     } else {
-      
+      // ── Reject: restore order to 'Ordered' status ──
       order.status = 'Ordered';
       await order.save();
 
-      
+      // Notify buyer
       const notif = new Notification({
         user: order.user,
         message: `❌ Your cancellation request for Order #LC-${String(order._id).slice(-6)} was rejected by the seller. The order will continue as normal.`
@@ -225,7 +225,7 @@ export const respondCancellation = async (req, res) => {
   }
 };
 
-
+// Seller update order status (Accepted, Rejected, Shipped, Delivered)
 export const updateOrderStatus = async (req, res) => {
   const orderId = req.params.orderId;
   const sellerId = req.user.id;
@@ -241,38 +241,38 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    
+    // Handle Reject refund logic
     if (status === 'Rejected' && order.status !== 'Rejected') {
-      
+      // For each item in the order, check if sold by this seller
       for (const oi of order.items) {
         const itemObj = await Item.findById(oi.item);
         if (itemObj && String(itemObj.seller) === String(sellerId)) {
-          
+          // Refund stock
           itemObj.stock += oi.quantity;
           await itemObj.save();
 
-          
+          // Deduct seller budget
           const seller = await User.findById(sellerId);
           seller.budget -= oi.price * oi.quantity;
           await seller.save();
         }
       }
 
-      
+      // Refund buyer total order price
       const buyer = await User.findById(order.user);
       if (buyer) {
         buyer.budget += order.total_price;
         await buyer.save();
       }
 
-      
+      // Notify Buyer
       const notif = new Notification({
         user: order.user,
         message: `Order #LC-${String(order._id).slice(-6)} rejected. Refunded.`
       });
       await notif.save();
     } else if (status !== order.status) {
-      
+      // General status updates notify buyer
       const notif = new Notification({
         user: order.user,
         message: `Order #LC-${String(order._id).slice(-6)} updated to ${status}`
@@ -293,7 +293,7 @@ export const updateOrderStatus = async (req, res) => {
   }
 };
 
-
+// Consumer: Request a return within 7 days of delivery
 export const requestReturn = async (req, res) => {
   const orderId = req.params.orderId;
   const userId = req.user.id;
@@ -308,7 +308,7 @@ export const requestReturn = async (req, res) => {
       return res.status(400).json({ message: 'You can only return a delivered order.' });
     }
 
-    
+    // Check 7-day window
     if (!order.date_delivered) {
       return res.status(400).json({ message: 'Delivery date not recorded. Please contact support.' });
     }
@@ -321,7 +321,7 @@ export const requestReturn = async (req, res) => {
     order.return_reason = reason || 'No reason provided';
     await order.save();
 
-    
+    // Notify all sellers in this order
     const orderItems = await OrderItem.find({ order: orderId }).populate({ path: 'item', select: 'seller name' });
     const notifiedSellers = new Set();
     for (const oi of orderItems) {
@@ -342,11 +342,11 @@ export const requestReturn = async (req, res) => {
   }
 };
 
-
+// Seller: Accept or reject a return request
 export const respondReturn = async (req, res) => {
   const orderId = req.params.orderId;
   const sellerId = req.user.id;
-  const { action } = req.body; 
+  const { action } = req.body; // 'accept' | 'reject'
 
   if (!['accept', 'reject'].includes(action)) {
     return res.status(400).json({ message: 'Invalid action. Use "accept" or "reject".' });
@@ -360,7 +360,7 @@ export const respondReturn = async (req, res) => {
       return res.status(400).json({ message: 'This order does not have a pending return request.' });
     }
 
-    
+    // Verify seller owns at least one item in the order
     const sellerItems = [];
     for (const oi of order.items) {
       const itemObj = await Item.findById(oi.item);
@@ -373,7 +373,7 @@ export const respondReturn = async (req, res) => {
     }
 
     if (action === 'accept') {
-      
+      // Restore stock and deduct seller budget
       for (const { oi, itemObj } of sellerItems) {
         itemObj.stock += oi.quantity;
         await itemObj.save();
@@ -384,7 +384,7 @@ export const respondReturn = async (req, res) => {
         }
       }
 
-      
+      // Refund buyer
       const buyer = await User.findById(order.user);
       if (buyer) {
         buyer.budget += order.total_price;
@@ -402,7 +402,7 @@ export const respondReturn = async (req, res) => {
       res.status(200).json({ message: `Return accepted. Buyer refunded ₹${order.total_price.toFixed(2)}.`, order });
 
     } else {
-      
+      // Reject: restore to Delivered
       order.status = 'Delivered';
       await order.save();
 
@@ -419,12 +419,12 @@ export const respondReturn = async (req, res) => {
   }
 };
 
-
+// Retrieve User Profile Analytics & Notification list
 export const getProfileDashboard = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    
+    // 1. Calculate spent analytics
     const orders = await Order.find({ user: userId });
     const totalSpent = orders.reduce((sum, o) => sum + o.total_price, 0.0);
     const loyaltyPoints = Math.floor(totalSpent / 10);
@@ -433,7 +433,7 @@ export const getProfileDashboard = async (req, res) => {
     const wishlist = await Wishlist.findOne({ user: userId });
     const wishlistCount = wishlist ? await WishlistItem.countDocuments({ wishlist: wishlist._id }) : 0;
 
-    
+    // Badges calculation
     const badges = [];
     if (orderCount > 5) {
       badges.push({ name: 'Elite Buyer', icon: '🏆', desc: 'More than 5 purchases' });
@@ -445,13 +445,13 @@ export const getProfileDashboard = async (req, res) => {
       badges.push({ name: 'Lucky Member', icon: '🛡️', desc: 'Verified Member' });
     }
 
-    
+    // Analytics data (Monthly Spend graph data, savings, category groupings)
     const userOrders = await Order.find({ user: userId }).populate({
       path: 'items',
       populate: { path: 'item' }
     });
 
-    const categoryCounts = ;
+    const categoryCounts = {};
     userOrders.forEach(o => {
       o.items.forEach(oi => {
         if (oi.item && oi.item.category) {
@@ -464,22 +464,22 @@ export const getProfileDashboard = async (req, res) => {
     const savings = Math.floor(totalSpent * 0.05);
     const loyaltyProgress = (loyaltyPoints % 1000) / 10;
 
-    
+    // Monthly spent data mockup (matches original Flask analytics)
     const monthlySpend = [120, 450, 300, 800, parseFloat((totalSpent % 1000).toFixed(2))];
     const maxSpend = Math.max(...monthlySpend) || 1;
     const barHeights = monthlySpend.map(val => (val / maxSpend) * 100);
 
-    
+    // Notifications list & count
     const notifications = await Notification.find({ user: userId })
       .sort({ date_created: -1 })
       .limit(10);
     
     const unreadNotifCount = await Notification.countDocuments({ user: userId, is_read: false });
 
-    
+    // Mark notifications as read upon page load
     await Notification.updateMany({ user: userId, is_read: false }, { is_read: true });
 
-    
+    // Recently viewed items query
     const recentlyViewedDocs = await ViewedItem.find({ user: userId })
       .sort({ date_viewed: -1 })
       .limit(6)
@@ -509,7 +509,7 @@ export const getProfileDashboard = async (req, res) => {
   }
 };
 
-
+// GET /api/orders/notifications — Works for any logged-in user (seller or consumer)
 export const getNotifications = async (req, res) => {
   const userId = req.user.id;
   try {
@@ -524,7 +524,7 @@ export const getNotifications = async (req, res) => {
   }
 };
 
-
+// POST /api/orders/notifications/mark-read — Mark all as read
 export const markNotificationsRead = async (req, res) => {
   const userId = req.user.id;
   try {

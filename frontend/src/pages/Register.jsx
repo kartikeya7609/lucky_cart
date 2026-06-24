@@ -10,32 +10,32 @@ const Register = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
 
-  
+  // Form states
   const [username, setUsername] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
   const [role, setRole] = useState('consumer');
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   
-  
+  // Shipping details
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [zipCode, setZipCode] = useState('');
 
-  
+  // Passwords
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
 
-  
+  // OTP details
   const [otpVal, setOtpVal] = useState(['', '', '', '']);
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [otpStatus, setOtpStatus] = useState({ message: '', type: '' });
-  const [remainingTime, setRemainingTime] = useState(300); 
+  const [remainingTime, setRemainingTime] = useState(300); // 5 minutes
   const [showResend, setShowResend] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  
+  // Send OTP via EmailJS
   const sendOtpEmail = (email) => {
     const otp = String(Math.floor(1000 + Math.random() * 9000));
     setGeneratedOtp(otp);
@@ -59,7 +59,7 @@ const Register = () => {
     });
   };
 
-  
+  // Countdown timer for OTP expiry
   useEffect(() => {
     let interval = null;
     if (step === 3 && remainingTime > 0) {
@@ -133,7 +133,7 @@ const Register = () => {
             zip_code: zipCode
           };
 
-          
+          // Debug: log exactly what we're sending
           console.log('Registration payload:', payload);
 
           const result = await register(payload);
@@ -171,7 +171,7 @@ const Register = () => {
         <div className="bg-[#16191D] border border-white/5 rounded-[2.5rem] shadow-[0_30px_80px_rgba(0,0,0,0.8)] overflow-hidden">
           <div className="bg-[#1C2025] p-6 sm:p-10 rounded-[2.4rem] border border-white/[0.03]">
 
-            
+            {/* Header */}
             <div className="mb-8 text-center">
               <div className="inline-flex items-center justify-center w-14 h-14 bg-white rounded-2xl mb-4 shadow-xl shadow-white/5">
                 <UserPlus className="text-[#0F1115]" size={28} />
@@ -179,7 +179,7 @@ const Register = () => {
               <h1 className="text-3xl font-black tracking-tight text-white uppercase">Create Account</h1>
               <p className="text-gray-500 text-sm mt-1">Join Lucky Cart in 3 easy steps</p>
 
-              
+              {/* Step Indicators */}
               <div className="flex items-center justify-center gap-3 mt-6">
                 <div className={`h-1.5 w-10 rounded-full transition-all duration-500 ${step >= 1 ? 'bg-white' : 'bg-white/10'}`}></div>
                 <div className={`h-1.5 w-10 rounded-full transition-all duration-500 ${step >= 2 ? 'bg-white' : 'bg-white/10'}`}></div>
@@ -190,7 +190,7 @@ const Register = () => {
               </p>
             </div>
 
-            
+            {/* STEP 1: Account Info & Personal Info */}
             {step === 1 && (
               <div className="space-y-8">
                 <div>
@@ -275,7 +275,7 @@ const Register = () => {
               </div>
             )}
 
-            
+            {/* STEP 2: Shipping & Security */}
             {step === 2 && (
               <div className="space-y-8">
                 <div>
@@ -380,7 +380,7 @@ const Register = () => {
               </div>
             )}
 
-            
+            {/* STEP 3: OTP Verification */}
             {step === 3 && (
               <div className="space-y-6">
                 <div className="text-center space-y-3">
@@ -393,7 +393,7 @@ const Register = () => {
                   </p>
                 </div>
 
-                
+                {/* OTP Inputs */}
                 <div className="flex justify-center gap-3 my-4">
                   {[0, 1, 2, 3].map((idx) => (
                     <input
@@ -423,7 +423,7 @@ const Register = () => {
                   ))}
                 </div>
 
-                
+                {/* OTP Status Badge */}
                 {otpStatus.message && (
                   <div className={`text-center text-sm font-bold py-2 px-4 rounded-xl border ${
                     otpStatus.type === 'success' 
@@ -434,7 +434,7 @@ const Register = () => {
                   </div>
                 )}
 
-                
+                {/* Timer & Resend */}
                 <div className="text-center text-xs text-gray-500">
                   OTP expires in <span className="text-white font-black">{formatTime(remainingTime)}</span>
                   {showResend && (
@@ -469,7 +469,7 @@ const Register = () => {
               </div>
             )}
 
-            
+            {/* Back to sign in link */}
             <div className="text-center pt-6 border-t border-white/5 mt-6">
               <p className="text-sm text-gray-500 font-bold">
                 Already have an account?{' '}

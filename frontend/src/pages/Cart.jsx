@@ -22,16 +22,16 @@ const Cart = () => {
   
   const navigate = useNavigate();
 
-  
+  // Coupon state
   const [couponInput, setCouponInput] = useState('');
   
-  
+  // Address States
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
 
-  
+  // New Address Form states
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [addressLine, setAddressLine] = useState('');
@@ -46,7 +46,7 @@ const Cart = () => {
       const data = await api.get('/addresses', token);
       setAddresses(data);
       
-      
+      // Pre-select default address
       const defaultAddr = data.find(a => a.is_default);
       if (defaultAddr) {
         setSelectedAddressId(defaultAddr._id);
@@ -89,7 +89,7 @@ const Cart = () => {
 
       addToast(res.message, 'success');
       
-      
+      // Clear forms
       setFullName('');
       setPhoneNumber('');
       setAddressLine('');
@@ -121,7 +121,7 @@ const Cart = () => {
     }
   };
 
-  
+  // Helper to calculate time left on 30 min window
   const getMinutesLeft = (dateAddedStr) => {
     const addedTime = new Date(dateAddedStr);
     const expiryTime = new Date(addedTime.getTime() + 30 * 60 * 1000);
@@ -160,10 +160,10 @@ const Cart = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+          {/* Cart Items List */}
           <div className="lg:col-span-2 space-y-6">
             {cartItems.map((cartItem) => {
-              const item = cartItem.item || ;
+              const item = cartItem.item || {};
               const minsLeft = getMinutesLeft(cartItem.date_added);
               const isLowStock = item.stock < 5;
 
@@ -172,7 +172,7 @@ const Cart = () => {
                   key={cartItem._id} 
                   className="flex flex-col sm:flex-row items-center gap-6 bg-[#16191D] p-6 rounded-3xl shadow-xl border border-white/5 relative overflow-hidden group"
                 >
-                  
+                  {/* Low Stock Indicator */}
                   {isLowStock && (
                     <div className="absolute top-0 left-0 right-0 py-1 bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-widest text-center border-b border-red-500/10 animate-pulse">
                       ⚠️ Only {item.stock} left in stock!
@@ -226,11 +226,11 @@ const Cart = () => {
             })}
           </div>
 
-          
+          {/* Sidebar / Checkout */}
           <div className="lg:col-span-1">
             <div className="bg-[#16191D] p-8 rounded-3xl shadow-2xl border border-white/5 sticky top-24 space-y-6">
               
-              
+              {/* Shipping Address Selector (Integrated into premium card) */}
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -280,7 +280,7 @@ const Cart = () => {
                 </div>
               </div>
 
-              
+              {/* Coupon Code Input */}
               <form onSubmit={handleApplyCoupon} className="mb-4">
                 <div className="flex gap-2">
                   <input 
@@ -330,7 +330,7 @@ const Cart = () => {
         </div>
       </div>
 
-      
+      {/* NEW ADDRESS MODAL */}
       {showAddressModal && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#16191D] border border-white/10 w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl rounded-2xl">

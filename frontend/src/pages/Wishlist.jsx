@@ -31,7 +31,7 @@ const Wishlist = () => {
 
   const togglePrivacy = async () => {
     try {
-      const res = await api.put('/wishlist/privacy', , token);
+      const res = await api.put('/wishlist/privacy', {}, token);
       addToast(res.message, 'success');
       await fetchWishlist();
     } catch (err) {
@@ -51,10 +51,10 @@ const Wishlist = () => {
 
   const handleMoveToCart = async (wishlistItemId) => {
     try {
-      const res = await api.post(`/wishlist/move-to-cart/${wishlistItemId}`, , token);
+      const res = await api.post(`/wishlist/move-to-cart/${wishlistItemId}`, {}, token);
       addToast(res.message, 'success');
       await fetchWishlist();
-      
+      // Also refresh global cart context
       await refreshCart();
     } catch (err) {
       addToast(err.message || 'Failed to move item to cart', 'danger');

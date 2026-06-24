@@ -1,6 +1,6 @@
 import { Wishlist, WishlistItem, Item, CartItem, User } from '../models/index.js';
 
-
+// Get Current User's Wishlist
 export const getWishlist = async (req, res) => {
   const userId = req.user.id;
 
@@ -19,7 +19,7 @@ export const getWishlist = async (req, res) => {
   }
 };
 
-
+// Add to Wishlist
 export const addToWishlist = async (req, res) => {
   const userId = req.user.id;
   const itemId = req.params.itemId;
@@ -36,7 +36,7 @@ export const addToWishlist = async (req, res) => {
       await wishlist.save();
     }
 
-    
+    // Check if already in wishlist
     const exists = await WishlistItem.findOne({ wishlist: wishlist._id, item: itemId });
     if (exists) {
       return res.status(200).json({ message: 'Already in wishlist!' });
@@ -55,7 +55,7 @@ export const addToWishlist = async (req, res) => {
   }
 };
 
-
+// Remove from Wishlist
 export const removeFromWishlist = async (req, res) => {
   const wishlistItemId = req.params.wishlistItemId;
   const userId = req.user.id;
@@ -66,7 +66,7 @@ export const removeFromWishlist = async (req, res) => {
       return res.status(404).json({ message: 'Wishlist item not found' });
     }
 
-    
+    // Auth check
     if (String(wi.wishlist.user) !== String(userId)) {
       return res.status(403).json({ message: 'Unauthorized.' });
     }
@@ -79,7 +79,7 @@ export const removeFromWishlist = async (req, res) => {
   }
 };
 
-
+// Move from Wishlist to Cart
 export const moveToCart = async (req, res) => {
   const wishlistItemId = req.params.wishlistItemId;
   const userId = req.user.id;
@@ -126,7 +126,7 @@ export const moveToCart = async (req, res) => {
   }
 };
 
-
+// Toggle privacy
 export const toggleWishlistPrivacy = async (req, res) => {
   const userId = req.user.id;
 
@@ -149,7 +149,7 @@ export const toggleWishlistPrivacy = async (req, res) => {
   }
 };
 
-
+// Get Public Wishlist by Username
 export const getPublicWishlist = async (req, res) => {
   const { username } = req.params;
   const currentUserId = req.user ? req.user.id : null;
@@ -165,7 +165,7 @@ export const getPublicWishlist = async (req, res) => {
       return res.status(404).json({ message: 'Wishlist not found' });
     }
 
-    
+    // Check privacy
     if (!wishlist.is_public && String(currentUserId) !== String(user._id)) {
       return res.status(403).json({ message: 'This wishlist is private.' });
     }

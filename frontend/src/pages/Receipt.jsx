@@ -15,7 +15,7 @@ const Receipt = () => {
     const fetchOrderDetails = async () => {
       setLoading(true);
       try {
-        
+        // Fetch order details via api client
         const data = await api.get(`/orders/receipt/${id}`, token);
         setOrder(data);
       } catch (err) {
@@ -52,7 +52,7 @@ const Receipt = () => {
     <div className="min-h-screen bg-gray-100 p-4 md:p-12 text-gray-900" style={{ margin: '-2rem' }}>
       <div className="max-w-4xl mx-auto bg-white p-8 md:p-16 rounded-lg shadow-sm border border-gray-100 receipt-container">
         
-        
+        {/* Receipt Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-10 mb-10">
           <div>
             <h1 className="text-4xl font-black tracking-tighter text-black">
@@ -69,7 +69,7 @@ const Receipt = () => {
           </div>
         </div>
 
-        
+        {/* Billing Info */}
         <div className="grid grid-cols-2 gap-12 mb-16">
           <div>
             <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Billed To</h3>
@@ -83,7 +83,7 @@ const Receipt = () => {
           </div>
         </div>
 
-        
+        {/* Items Table */}
         <div className="mb-16 overflow-x-auto">
           <table className="w-full text-left min-w-[500px]">
             <thead>
@@ -110,7 +110,7 @@ const Receipt = () => {
           </table>
         </div>
 
-        
+        {/* Totals Breakdown */}
         <div className="flex justify-end border-t border-gray-100 pt-10">
           <div className="w-full md:w-1/3 space-y-4">
             <div className="flex justify-between text-sm">
@@ -128,14 +128,14 @@ const Receipt = () => {
           </div>
         </div>
 
-        
+        {/* Footer */}
         <div className="mt-24 text-center border-t border-gray-50 pt-10">
           <p className="text-sm font-bold text-black">Thank you for your business!</p>
           <p className="text-xs text-gray-400 mt-2">Lucky Cart | Premium Digital Exchange</p>
         </div>
       </div>
 
-      
+      {/* Actions */}
       <div className="max-w-4xl mx-auto mt-12 flex justify-between items-center no-print">
         <Link to="/orders" className="text-sm font-bold text-gray-500 hover:text-black transition-all flex items-center gap-2">
           <ArrowLeft size={16} /> Back to Orders

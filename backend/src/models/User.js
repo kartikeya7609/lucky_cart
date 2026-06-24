@@ -64,7 +64,7 @@ const userSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-
+// Hash password before saving
 userSchema.pre('save', async function () {
   if (!this.isModified('password_hash')) return;
   try {
@@ -75,17 +75,17 @@ userSchema.pre('save', async function () {
   }
 });
 
-
+// Compare password method
 userSchema.methods.comparePassword = async function (attemptedPassword) {
   return await bcrypt.compare(attemptedPassword, this.password_hash);
 };
 
-
+// Check if user has sufficient budget
 userSchema.methods.canPurchase = function (amount) {
   return this.budget >= amount;
 };
 
-
+// Virtual prettier budget
 userSchema.virtual('prettier_budget').get(function () {
   const b = Math.floor(this.budget);
   const s = String(b);

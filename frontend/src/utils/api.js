@@ -1,4 +1,4 @@
-
+// Centralized fetch wrapper for backend API calls
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const handleResponse = async (res) => {
@@ -17,7 +17,7 @@ const handleResponse = async (res) => {
 
 export const api = {
   get: async (endpoint, token = null) => {
-    const headers = ;
+    const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -28,7 +28,7 @@ export const api = {
   },
 
   post: async (endpoint, body, token = null, isMultipart = false) => {
-    const headers = ;
+    const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (!isMultipart) headers['Content-Type'] = 'application/json';
 
@@ -41,7 +41,7 @@ export const api = {
   },
 
   put: async (endpoint, body, token = null, isMultipart = false) => {
-    const headers = ;
+    const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (!isMultipart) headers['Content-Type'] = 'application/json';
 
@@ -54,7 +54,7 @@ export const api = {
   },
 
   delete: async (endpoint, token = null) => {
-    const headers = ;
+    const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const res = await fetch(`${API_BASE}${endpoint}`, {
