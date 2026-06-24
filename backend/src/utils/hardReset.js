@@ -1,14 +1,4 @@
-/**
- * ─────────────────────────────────────────────────────────────────
- *  Lucky Cart — HARD Database Reset Script
- *  Run: node src/utils/hardReset.js
- *
- *  What it wipes (EVERYTHING):
- *    Users, Items, CartItems, Orders, OrderItems,
- *    Wishlists, WishlistItems, Addresses,
- *    Coupons, Notifications, ViewedItems, Reviews
- * ─────────────────────────────────────────────────────────────────
- */
+
 
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
@@ -51,7 +41,7 @@ async function hardResetDatabase() {
 
   for (const { name, model } of RESET_TARGETS) {
     try {
-      const result = await model.deleteMany({});
+      const result = await model.deleteMany();
       const count = result.deletedCount;
       totalDeleted += count;
       const icon = count > 0 ? '🔥' : '✅';

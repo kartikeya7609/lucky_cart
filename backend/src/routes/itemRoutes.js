@@ -13,7 +13,7 @@ import { protect, optionalProtect, sellerOnly } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Multer memory storage configuration for file parsing
+
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 

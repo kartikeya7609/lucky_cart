@@ -15,27 +15,27 @@ const Marketplace = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // API State
+  
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMobileCategories, setShowMobileCategories] = useState(false);
 
-  // Cart/Wishlist loading states per item
+  
   const [cartLoadingId, setCartLoadingId] = useState(null);
   const [wishlistLoadingId, setWishlistLoadingId] = useState(null);
 
-  // Filter & Sort State (derived from URL params or defaults)
+  
   const searchQuery = searchParams.get('q') || '';
   const activeCategory = searchParams.get('category') || 'All';
   const sort = searchParams.get('sort') || 'random';
   const page = parseInt(searchParams.get('page')) || 1;
   const [pagination, setPagination] = useState({ pages: 1, hasPrev: false, hasNext: false });
 
-  // Controlled input — kept in sync with URL param on mount/navigation
+  
   const [searchInput, setSearchInput] = useState(searchQuery);
 
-  // Keep local input in sync when URL changes (e.g. back/forward)
+  
   useEffect(() => {
     setSearchInput(searchQuery);
   }, [searchQuery]);
@@ -63,10 +63,10 @@ const Marketplace = () => {
 
   useEffect(() => {
     fetchItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [searchQuery, activeCategory, sort, page]);
 
-  /* ─── URL helpers ─────────────────────────────────────── */
+  
   const updateParams = (updates) => {
     const next = new URLSearchParams(searchParams);
     Object.entries(updates).forEach(([k, v]) => next.set(k, v));
@@ -92,18 +92,18 @@ const Marketplace = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  /* ─── Cart ────────────────────────────────────────────── */
+  
   const handleAddToCart = async (item) => {
     if (!token) {
       addToast('Please login to add items to your cart.', 'warning');
       return;
     }
-    // Guard: only consumers can add to cart
+    
     if (user?.role !== 'consumer') return;
 
     setCartLoadingId(item._id);
     try {
-      // Pass item._id — adjust if your CartContext expects the name
+      
       await addToCart(item._id);
       addToast(`"${item.name}" added to cart!`, 'success');
     } catch (err) {
@@ -113,7 +113,7 @@ const Marketplace = () => {
     }
   };
 
-  /* ─── Wishlist ────────────────────────────────────────── */
+  
   const handleAddToWishlist = async (item) => {
     if (!token) {
       addToast('Please login to save items to wishlist.', 'warning');
@@ -123,7 +123,7 @@ const Marketplace = () => {
 
     setWishlistLoadingId(item._id);
     try {
-      const res = await api.post(`/wishlist/add/${item._id}`, {}, token);
+      const res = await api.post(`/wishlist/add/${item._id}`, , token);
       addToast(res.message || 'Saved to wishlist!', 'success');
     } catch (err) {
       addToast(err?.message || 'Failed to save to wishlist.', 'danger');
@@ -132,7 +132,7 @@ const Marketplace = () => {
     }
   };
 
-  /* ─── Category icon ───────────────────────────────────── */
+  
   const getCategoryIcon = (category, size = 12) => {
     const cat = category.toLowerCase();
     if (cat.includes('elect')) return <Laptop size={size} />;
@@ -149,16 +149,16 @@ const Marketplace = () => {
     return <Box size={size} />;
   };
 
-  /* ─── Group items by category ─────────────────────────── */
+  
   const groupItemsByCategory = (itemsList) =>
     itemsList.reduce((acc, item) => {
       const cat = item.category || 'General';
       if (!acc[cat]) acc[cat] = [];
       acc[cat].push(item);
       return acc;
-    }, {});
+    }, );
 
-  /* ─── Item card grid ──────────────────────────────────── */
+  
   const renderItemGrid = (itemsList) => (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-px bg-white/5 border border-white/5 shadow-2xl overflow-hidden">
       {itemsList.map((item) => {
@@ -173,9 +173,9 @@ const Marketplace = () => {
             key={item._id}
             className="group relative bg-[#16191D] flex flex-col hover:z-10 transition-all duration-500 hover:shadow-[0_0_50px_rgba(0,0,0,0.5)]"
           >
-            {/* Image */}
+            
             <div className="aspect-square relative overflow-hidden bg-[#1C2025]">
-              {/* Shimmer */}
+              
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite] pointer-events-none" />
 
               <div
@@ -194,7 +194,7 @@ const Marketplace = () => {
                 />
               </div>
 
-              {/* Badges */}
+              
               <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none">
                 <span className="px-2 py-0.5 bg-black/60 backdrop-blur-md border border-white/10 text-[7px] font-black uppercase tracking-[0.2em] text-white shadow-2xl">
                   {item.category}
@@ -211,9 +211,9 @@ const Marketplace = () => {
                 )}
               </div>
 
-              {/* Hover overlay — actions */}
+              
               <div className="absolute inset-0 bg-[#0F1115]/90 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-3 p-6 backdrop-blur-sm translate-y-2 group-hover:translate-y-0 z-20">
-                {/* Add to Cart — only for logged-in consumers with stock */}
+                
                 {isConsumer && !isSoldOut && (
                   <button
                     onClick={() => handleAddToCart(item)}
@@ -224,7 +224,7 @@ const Marketplace = () => {
                   </button>
                 )}
 
-                {/* Add to Wishlist — only for logged-in consumers */}
+                
                 {isConsumer && (
                   <button
                     onClick={() => handleAddToWishlist(item)}
@@ -235,7 +235,7 @@ const Marketplace = () => {
                   </button>
                 )}
 
-                {/* Prompt non-logged-in users */}
+                
                 {!token && (
                   <button
                     onClick={() => navigate('/login')}
@@ -254,9 +254,9 @@ const Marketplace = () => {
               </div>
             </div>
 
-            {/* Card info */}
+            
             <div className="p-5 flex-grow flex flex-col border-t border-white/5 bg-gradient-to-b from-transparent to-black/20">
-              {/* Stars */}
+              
               <div className="flex items-center gap-0.5 mb-3">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <svg
@@ -303,12 +303,12 @@ const Marketplace = () => {
 
   const isGroupedMode = sort === 'category' || (activeCategory && activeCategory !== 'All');
 
-  /* ─── Render ──────────────────────────────────────────── */
+  
   return (
     <div className="min-h-screen bg-[#0F1115] px-2 py-8 md:px-4 md:py-12">
       <div className="max-w-[1600px] mx-auto">
 
-        {/* ── Header & Search ──────────────────────────── */}
+        
         <div className="text-center mb-10 md:mb-16">
           <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase mb-4">
             Market Exchange
@@ -351,7 +351,7 @@ const Marketplace = () => {
           </form>
         </div>
 
-        {/* ── Mobile category toggle ────────────────────── */}
+        
         <div className="md:hidden px-4 mb-6">
           <button
             onClick={() => setShowMobileCategories((v) => !v)}
@@ -386,7 +386,7 @@ const Marketplace = () => {
           )}
         </div>
 
-        {/* ── Desktop categories bar ────────────────────── */}
+        
         <div className="hidden md:block mb-12">
           <div className="flex items-center justify-between border-b border-white/5 pb-6 px-4 mb-4">
             <div className="flex items-center gap-2">
@@ -402,9 +402,9 @@ const Marketplace = () => {
             </span>
           </div>
 
-          {/* Square tiles — matching Flask template */}
+          
           <div className="flex overflow-x-auto no-scrollbar gap-3 px-4 pb-2 scroll-smooth">
-            {/* All */}
+            
             <button
               onClick={() => handleCategoryChange('All')}
               className={`flex flex-col items-center justify-center min-w-[100px] aspect-square p-4 flex-shrink-0 transition-all active:scale-95 group ${activeCategory === 'All' ? 'bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.1)]' : 'bg-[#16191D] text-gray-500 hover:text-white border border-white/5'}`}
@@ -430,7 +430,7 @@ const Marketplace = () => {
           </div>
         </div>
 
-        {/* ── Items grid ────────────────────────────────── */}
+        
         {loading ? (
           <div className="text-center py-20">
             <p className="text-gray-500 text-xs font-bold uppercase tracking-[0.3em] animate-pulse">
@@ -464,10 +464,10 @@ const Marketplace = () => {
               <div className="px-4">{renderItemGrid(items)}</div>
             )}
 
-            {/* Pagination */}
+            
             {pagination.pages > 1 && (
               <div className="flex flex-wrap items-center justify-center gap-1 pt-12 p-2 bg-[#16191D] border border-white/5 max-w-full mx-auto rounded-xl">
-                {/* Prev */}
+                
                 <button
                   disabled={!pagination.hasPrev}
                   onClick={() => handlePageChange(pagination.prevNum ?? page - 1)}
@@ -476,7 +476,7 @@ const Marketplace = () => {
                   ← Prev
                 </button>
 
-                {/* Page numbers */}
+                
                 {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((pNum) => (
                   <button
                     key={pNum}
@@ -487,7 +487,7 @@ const Marketplace = () => {
                   </button>
                 ))}
 
-                {/* Next */}
+                
                 <button
                   disabled={!pagination.hasNext}
                   onClick={() => handlePageChange(pagination.nextNum ?? page + 1)}

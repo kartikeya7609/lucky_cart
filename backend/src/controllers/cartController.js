@@ -1,6 +1,6 @@
 import { CartItem, Item, User, Order, OrderItem, Coupon, Wishlist, WishlistItem, Notification } from '../models/index.js';
 
-// Retrieve cart items and perform stock/expiry validation
+
 export const getCart = async (req, res) => {
   const userId = req.user.id;
   
@@ -10,7 +10,7 @@ export const getCart = async (req, res) => {
     });
   }
 
-  const couponCode = req.query.couponCode; // coupon can be passed from client
+  const couponCode = req.query.couponCode; 
 
   try {
     let cartItems = await CartItem.find({ user: userId }).populate('item');
@@ -20,7 +20,7 @@ export const getCart = async (req, res) => {
     const messages = [];
 
     for (const c of cartItems) {
-      // 1. Expiration check: 30 minutes
+      
       const diffMs = now - new Date(c.date_added);
       const diffMins = diffMs / (1000 * 60);
       
@@ -30,7 +30,7 @@ export const getCart = async (req, res) => {
         continue;
       }
 
-      // 2. Stock check
+      
       if (!c.item || c.item.stock <= 0) {
         await CartItem.findByIdAndDelete(c._id);
         messages.push(`${c.item ? c.item.name : 'An item'} is sold out and has been removed.`);
@@ -43,12 +43,12 @@ export const getCart = async (req, res) => {
       }
     }
 
-    // Refresh cart items if mutated
+    
     if (revalidated || expired) {
       cartItems = await CartItem.find({ user: userId }).populate('item');
     }
 
-    // Calculate billing details
+    
     const subtotal = cartItems.reduce((sum, c) => sum + (c.item.price * c.quantity), 0);
     let discount = 0;
     let appliedCoupon = null;
@@ -84,10 +84,10 @@ export const getCart = async (req, res) => {
   }
 };
 
-// Add to Cart
+
 export const addToCart = async (req, res) => {
   const userId = req.user.id;
-  // Accept either item_id (ObjectId, preferred) or added_item (legacy name lookup)
+  
   const { item_id, added_item } = req.body;
 
   try {
@@ -105,7 +105,7 @@ export const addToCart = async (req, res) => {
     if (existing) {
       if (existing.quantity < itemObj.stock) {
         existing.quantity += 1;
-        existing.date_added = new Date(); // Reset cart timer
+        existing.date_added = new Date(); 
         await existing.save();
         res.status(200).json({ message: `Increased ${itemObj.name} quantity!`, cartItem: existing });
       } else {
@@ -127,7 +127,7 @@ export const addToCart = async (req, res) => {
   }
 };
 
-// Remove from Cart
+
 export const removeFromCart = async (req, res) => {
   const cartItemId = req.params.cartItemId;
   const userId = req.user.id;
@@ -145,7 +145,7 @@ export const removeFromCart = async (req, res) => {
   }
 };
 
-// Apply Coupon Code
+
 export const applyCoupon = async (req, res) => {
   const { coupon_code } = req.body;
 
@@ -168,7 +168,7 @@ export const applyCoupon = async (req, res) => {
   }
 };
 
-// Save for Later (Move from Cart to Wishlist)
+
 export const saveForLater = async (req, res) => {
   const cartItemId = req.params.cartItemId;
   const userId = req.user.id;
@@ -186,7 +186,7 @@ export const saveForLater = async (req, res) => {
       await wishlist.save();
     }
 
-    // Check if already in wishlist
+    
     const exists = await WishlistItem.findOne({ wishlist: wishlist._id, item: item._id });
     if (!exists) {
       const wishItem = new WishlistItem({ wishlist: wishlist._id, item: item._id });
@@ -203,7 +203,7 @@ export const saveForLater = async (req, res) => {
   }
 };
 
-// Checkout Cart
+
 export const checkout = async (req, res) => {
   const userId = req.user.id;
   const { couponCode, addressId } = req.body;
@@ -214,7 +214,7 @@ export const checkout = async (req, res) => {
       return res.status(400).json({ message: 'Cart is empty!' });
     }
 
-    // 1. Calculate and validate total price
+    
     const subtotal = cartItems.reduce((sum, c) => sum + (c.item.price * c.quantity), 0);
     let discount = 0;
 
@@ -232,14 +232,14 @@ export const checkout = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient funds.' });
     }
 
-    // 2. Validate stock for all items
+    
     for (const c of cartItems) {
       if (c.item.stock < c.quantity) {
         return res.status(400).json({ message: `Not enough stock for ${c.item.name}.` });
       }
     }
 
-    // 3. Deduct stock and adjust budgets
+    
     for (const c of cartItems) {
       const itemObj = await Item.findById(c.item._id);
       itemObj.stock -= c.quantity;
@@ -254,11 +254,11 @@ export const checkout = async (req, res) => {
       }
     }
 
-    // Deduct buyer budget
+    
     buyer.budget -= total;
     await buyer.save();
 
-    // 4. Create Order and OrderItems
+    
     const order = new Order({
       user: userId,
       total_price: total,
@@ -276,10 +276,10 @@ export const checkout = async (req, res) => {
       await orderItem.save();
     }
 
-    // 5. Clear Cart
+    
     await CartItem.deleteMany({ user: userId });
 
-    // 6. Notify Sellers (group notification by unique seller id)
+    
     const notifiedSellers = new Set();
     for (const c of cartItems) {
       if (c.item.seller) {

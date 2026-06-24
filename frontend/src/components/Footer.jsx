@@ -7,7 +7,7 @@ const Footer = () => {
     <footer className="hidden lg:block bg-[#0A0C10] border-t border-white/5 pt-16 pb-8 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Top Features Section */}
+        
         <div className="grid grid-cols-4 gap-8 pb-12 border-b border-white/5 mb-12">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-blue-400">
@@ -47,9 +47,9 @@ const Footer = () => {
           </div>
         </div>
 
-        {/* Main Footer Content */}
+        
         <div className="grid grid-cols-4 gap-12 mb-12">
-          {/* Brand Info */}
+          
           <div className="col-span-1">
             <Link to="/" className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-tr from-green-400 to-emerald-600 rounded-xl flex items-center justify-center">
@@ -76,7 +76,7 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Links 1 */}
+          
           <div className="col-span-1">
             <h4 className="text-white font-black text-xs uppercase tracking-[0.2em] mb-6">Shop</h4>
             <ul className="space-y-4">
@@ -87,7 +87,7 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Links 2 */}
+          
           <div className="col-span-1">
             <h4 className="text-white font-black text-xs uppercase tracking-[0.2em] mb-6">Support</h4>
             <ul className="space-y-4">
@@ -98,7 +98,7 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Newsletter */}
+          
           <div className="col-span-1">
             <h4 className="text-white font-black text-xs uppercase tracking-[0.2em] mb-6">Newsletter</h4>
             <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-4 leading-relaxed">
@@ -120,7 +120,7 @@ const Footer = () => {
           </div>
         </div>
 
-        {/* Bottom Bar */}
+        
         <div className="pt-8 border-t border-white/5 flex items-center justify-between">
           <p className="text-gray-600 text-[10px] font-black uppercase tracking-[0.2em]">
             &copy; {new Date().getFullYear()} Lucky Cart. All rights reserved.

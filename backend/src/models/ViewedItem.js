@@ -19,7 +19,7 @@ const viewedItemSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound index to quickly find user-item view logs
+
 viewedItemSchema.index({ user: 1, item: 1 }, { unique: true });
 
 const ViewedItem = mongoose.model('ViewedItem', viewedItemSchema);

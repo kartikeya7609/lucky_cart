@@ -10,24 +10,24 @@ const seedDatabase = async () => {
     await connectDB();
 
     console.log("Dropping existing collections...");
-    await User.deleteMany({});
-    await Item.deleteMany({});
-    await Wishlist.deleteMany({});
-    await Coupon.deleteMany({});
-    await CartItem.deleteMany({});
-    await Order.deleteMany({});
-    await OrderItem.deleteMany({});
-    await Review.deleteMany({});
-    await Address.deleteMany({});
-    await Notification.deleteMany({});
+    await User.deleteMany();
+    await Item.deleteMany();
+    await Wishlist.deleteMany();
+    await Coupon.deleteMany();
+    await CartItem.deleteMany();
+    await Order.deleteMany();
+    await OrderItem.deleteMany();
+    await Review.deleteMany();
+    await Address.deleteMany();
+    await Notification.deleteMany();
 
     console.log("Creating default Users...");
     
-    // Create Seller
+    
     const seller = new User({
       username: 'seller1',
       email_address: 'seller1@luckycart.com',
-      password_hash: 'password123', // will be hashed by User pre-save hook
+      password_hash: 'password123', 
       budget: 15000.00,
       role: 'seller',
       full_name: 'John Seller',
@@ -39,11 +39,11 @@ const seedDatabase = async () => {
     });
     await seller.save();
 
-    // Create Consumer
+    
     const consumer = new User({
       username: 'consumer1',
       email_address: 'consumer1@luckycart.com',
-      password_hash: 'password123', // will be hashed by User pre-save hook
+      password_hash: 'password123', 
       budget: 10000.00,
       role: 'consumer',
       full_name: 'Alice Consumer',
@@ -55,7 +55,7 @@ const seedDatabase = async () => {
     });
     await consumer.save();
 
-    // Create Wishlists
+    
     await new Wishlist({ user: seller._id }).save();
     await new Wishlist({ user: consumer._id }).save();
 

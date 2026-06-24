@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { User, Wishlist } from '../models/index.js';
 import cloudinary from '../config/cloudinary.js';
 
-// Helper to generate JWT tokens
+
 const generateTokens = (userId) => {
   const accessToken = jwt.sign(
     { id: userId },
@@ -19,7 +19,7 @@ const generateTokens = (userId) => {
   return { accessToken, refreshToken };
 };
 
-// Register User
+
 export const registerUser = async (req, res) => {
   const {
     username,
@@ -34,7 +34,7 @@ export const registerUser = async (req, res) => {
     zip_code
   } = req.body;
 
-  // Validate required fields upfront
+  
   const missing = [];
   if (!username)      missing.push('username');
   if (!email_address) missing.push('email_address');
@@ -53,7 +53,7 @@ export const registerUser = async (req, res) => {
   }
 
   try {
-    // Check if user already exists
+    
     const userExists = await User.findOne({
       $or: [
         { username: username.trim() },
@@ -65,11 +65,11 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Username or email already exists' });
     }
 
-    // Create user. Note: pre-save hook will hash the password.
+    
     const user = new User({
       username: username.trim(),
       email_address: email_address.trim().toLowerCase(),
-      password_hash: password, // will be hashed in pre-save hook
+      password_hash: password, 
       role: role || 'consumer',
       full_name: full_name.trim(),
       phone_number: phone_number.trim(),
@@ -81,18 +81,18 @@ export const registerUser = async (req, res) => {
 
     await user.save();
 
-    // Create associated Wishlist for user
+    
     const wishlist = new Wishlist({ user: user._id });
     await wishlist.save();
 
-    // Generate tokens
+    
     const { accessToken, refreshToken } = generateTokens(user._id);
 
-    // Set cookie
+    
     res.cookie('access_token', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 3600000 // 1 hour
+      maxAge: 3600000 
     });
 
     res.status(201).json({
@@ -110,7 +110,7 @@ export const registerUser = async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    // Surface Mongoose validation errors clearly
+    
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(e => e.message);
       return res.status(400).json({ message: messages.join('. ') });
@@ -119,12 +119,12 @@ export const registerUser = async (req, res) => {
   }
 };
 
-// Login User & Admin
+
 export const loginUser = async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // 1. Check Admin credentials first (admin1234 / admin)
+    
     if (username === 'admin1234' && password === 'admin') {
       const adminToken = jwt.sign(
         { id: 'admin', role: 'admin' },
@@ -135,7 +135,7 @@ export const loginUser = async (req, res) => {
       res.cookie('access_token', adminToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 7200000 // 2 hours
+        maxAge: 7200000 
       });
 
       return res.status(200).json({
@@ -148,7 +148,7 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // 2. Regular User Login — accept username OR email address
+    
     const identifier = username?.trim();
     const isEmail = identifier?.includes('@');
 
@@ -167,14 +167,14 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials. Wrong password.' });
     }
 
-    // Generate tokens
+    
     const { accessToken, refreshToken } = generateTokens(user._id);
 
-    // Set cookie
+    
     res.cookie('access_token', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 3600000 // 1 hour
+      maxAge: 3600000 
     });
 
     res.status(200).json({
@@ -197,19 +197,19 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// Verify OTP (Mock API conforming to Flask /verify_otp)
+
 export const verifyOtp = async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ status: 'error', message: 'Email required' });
   }
   
-  // Return OK - the verification is initiated on the client side (EmailJS)
-  // and the backend just validates and stores or approves it.
+  
+  
   return res.status(200).json({ status: 'ok', email });
 };
 
-// Refresh JWT Token
+
 export const refreshToken = async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken) {
@@ -219,7 +219,7 @@ export const refreshToken = async (req, res) => {
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'ec9439cfc6c796ae2029594d_jwt_refresh');
     
-    // Check if it's admin
+    
     if (decoded.role === 'admin') {
       const adminToken = jwt.sign(
         { id: 'admin', role: 'admin' },
@@ -246,7 +246,7 @@ export const refreshToken = async (req, res) => {
   }
 };
 
-// Logout User
+
 export const logoutUser = async (req, res) => {
   res.clearCookie('access_token');
   res.status(200).json({ message: 'Logged out successfully' });
@@ -312,7 +312,7 @@ export const updateMe = async (req, res) => {
     if (zip_code !== undefined) user.zip_code = zip_code;
 
     if (req.file) {
-      // Convert buffer to base64 for Cloudinary
+      
       const b64 = Buffer.from(req.file.buffer).toString('base64');
       const dataURI = 'data:' + req.file.mimetype + ';base64,' + b64;
       
@@ -349,7 +349,7 @@ export const updateMe = async (req, res) => {
   }
 };
 
-// Admin Login
+
 export const adminLogin = async (req, res) => {
   const { username, password } = req.body;
 
@@ -366,7 +366,7 @@ export const adminLogin = async (req, res) => {
     res.cookie('access_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 7200000 // 2 hours
+      maxAge: 7200000 
     });
 
     return res.status(200).json({

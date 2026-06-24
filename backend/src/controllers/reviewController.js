@@ -2,7 +2,7 @@ import { Review, Item, Order, OrderItem } from '../models/index.js';
 import cloudinary from '../config/cloudinary.js';
 import { Readable } from 'stream';
 
-// ─── Helper: upload buffer to Cloudinary ──────────────────────────────────────
+
 const uploadToCloudinary = (buffer) =>
   new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -15,7 +15,7 @@ const uploadToCloudinary = (buffer) =>
     Readable.from(buffer).pipe(stream);
   });
 
-// ─── Submit / Update Review (consumer) ───────────────────────────────────────
+
 export const submitReview = async (req, res) => {
   const itemId = req.params.itemId;
   const userId = req.user.id;
@@ -25,7 +25,7 @@ export const submitReview = async (req, res) => {
     const item = await Item.findById(itemId);
     if (!item) return res.status(404).json({ message: 'Item not found' });
 
-    // Verify purchase
+    
     const userOrders = await Order.find({ user: userId });
     const orderIds = userOrders.map(o => o._id);
     const purchased = await OrderItem.findOne({ order: { $in: orderIds }, item: itemId });
@@ -33,7 +33,7 @@ export const submitReview = async (req, res) => {
       return res.status(403).json({ message: 'You must purchase this item first to leave a review.' });
     }
 
-    // Upload image if provided
+    
     let imageUrl = undefined;
     if (req.file) {
       try {
@@ -44,7 +44,7 @@ export const submitReview = async (req, res) => {
       }
     }
 
-    // Upsert review
+    
     let review = await Review.findOne({ user: userId, item: itemId });
     if (review) {
       review.rating = parseInt(rating);
@@ -70,7 +70,7 @@ export const submitReview = async (req, res) => {
   }
 };
 
-// ─── Edit Review (consumer — own review only) ─────────────────────────────────
+
 export const editReview = async (req, res) => {
   const { reviewId } = req.params;
   const userId = req.user.id;
@@ -86,7 +86,7 @@ export const editReview = async (req, res) => {
     if (rating) review.rating = parseInt(rating);
     if (comment) review.comment = comment;
 
-    // Upload new image if provided
+    
     if (req.file) {
       try {
         const result = await uploadToCloudinary(req.file.buffer);
@@ -104,9 +104,9 @@ export const editReview = async (req, res) => {
   }
 };
 
-// ─── Delete Review ────────────────────────────────────────────────────────────
-// Consumer: delete own review
-// Seller: delete any review on their own items (moderation)
+
+
+
 export const deleteReview = async (req, res) => {
   const { reviewId } = req.params;
   const userId = req.user.id;
@@ -131,7 +131,7 @@ export const deleteReview = async (req, res) => {
   }
 };
 
-// ─── Reply to Review (seller — own items only) ───────────────────────────────
+
 export const replyToReview = async (req, res) => {
   const { reviewId } = req.params;
   const sellerId = req.user.id;
@@ -154,7 +154,7 @@ export const replyToReview = async (req, res) => {
   }
 };
 
-// ─── Delete Seller Reply (seller — own items only) ───────────────────────────
+
 export const deleteSellerReply = async (req, res) => {
   const { reviewId } = req.params;
   const sellerId = req.user.id;

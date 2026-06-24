@@ -53,11 +53,11 @@ const Login = () => {
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
 
-        {/* Card */}
+        
         <div className="bg-[#16191D] rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.7)] border border-white/5 overflow-hidden">
           <div className="bg-[#1C2025] p-8 md:p-10 border-b border-white/5">
 
-            {/* Header */}
+            
             <div className="mb-8 text-center">
               <div className="inline-flex items-center justify-center w-12 h-12 bg-white rounded-xl mb-4 shadow-lg">
                 <LogIn className="text-[#0F1115]" size={22} />
@@ -66,14 +66,14 @@ const Login = () => {
               <p className="mt-1.5 text-xs text-gray-500 uppercase tracking-widest font-bold">Sign in to your account</p>
             </div>
 
-            {/* Error Banner */}
+            
             {error && (
               <div className="mb-5 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold text-center">
                 {error}
               </div>
             )}
 
-            {/* Form */}
+            
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">
@@ -124,7 +124,7 @@ const Login = () => {
             </form>
           </div>
 
-          {/* Quick Access */}
+          
           <div className="p-5 bg-[#16191D]">
             <p className="text-[10px] font-black text-gray-600 uppercase tracking-[0.25em] text-center mb-3">
               Quick Access — all use <span className="text-gray-400">password123</span>

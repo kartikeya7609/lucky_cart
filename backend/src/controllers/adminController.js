@@ -1,6 +1,6 @@
 import { Order, Item, User, Review } from '../models/index.js';
 
-// Get all users on the platform (Admin dashboard)
+
 export const getAdminUsers = async (req, res) => {
   try {
     const users = await User.find().select('-password_hash').sort({ createdAt: -1 });
@@ -11,7 +11,7 @@ export const getAdminUsers = async (req, res) => {
   }
 };
 
-// Get all products (Admin dashboard)
+
 export const getAdminProducts = async (req, res) => {
   try {
     const items = await Item.find().populate('seller', 'username');
@@ -22,7 +22,7 @@ export const getAdminProducts = async (req, res) => {
   }
 };
 
-// Get all reviews (Admin dashboard)
+
 export const getAdminReviews = async (req, res) => {
   try {
     const reviews = await Review.find()
@@ -36,7 +36,7 @@ export const getAdminReviews = async (req, res) => {
   }
 };
 
-// Approve a review (Admin dashboard)
+
 export const approveReview = async (req, res) => {
   try {
     const review = await Review.findById(req.params.id);
@@ -50,7 +50,7 @@ export const approveReview = async (req, res) => {
   }
 };
 
-// Delete a review (Admin dashboard)
+
 export const adminDeleteReview = async (req, res) => {
   try {
     const review = await Review.findByIdAndDelete(req.params.id);
@@ -62,7 +62,7 @@ export const adminDeleteReview = async (req, res) => {
   }
 };
 
-// Get system activity logs (Admin dashboard)
+
 export const getAdminActivity = async (req, res) => {
   try {
     const [orders, users, items, reviews] = await Promise.all([
@@ -117,7 +117,7 @@ export const getAdminActivity = async (req, res) => {
     console.error(error);
     res.status(500).json({ message: 'Server error retrieving admin activities' });
   }
-};// Get all orders on the platform (Admin dashboard)
+};
 export const getAdminOrders = async (req, res) => {
   try {
     const orders = await Order.find()
@@ -136,13 +136,13 @@ export const getAdminOrders = async (req, res) => {
   }
 };
 
-// ─── Helper: escape a CSV field ──────────────────────────────────────────────
+
 const esc = (val) => {
   if (val == null) return '""';
   return `"${String(val).replace(/"/g, '""')}"`;
 };
 
-// Export all system data as a single comprehensive CSV file
+
 export const exportDataCsv = async (req, res) => {
   try {
     const [items, users, orders, reviews] = await Promise.all([
@@ -152,11 +152,11 @@ export const exportDataCsv = async (req, res) => {
       Review.find().populate('user', 'username').populate('item', 'name')
     ]);
 
-    // BOM for Excel UTF-8 compatibility
+    
     const BOM = '\uFEFF';
     let csvContent = BOM;
 
-    // ── 1. Items ────────────────────────────────────────────────────────────
+    
     csvContent += '=== ITEMS ===\n';
     csvContent += 'ID,Name,Category,Price (INR),Stock,Barcode,Seller Username,Seller ID\n';
     for (const item of items) {
@@ -174,7 +174,7 @@ export const exportDataCsv = async (req, res) => {
 
     csvContent += '\n';
 
-    // ── 2. Users ────────────────────────────────────────────────────────────
+    
     csvContent += '=== USERS ===\n';
     csvContent += 'ID,Username,Email,Role,Budget (INR),Joined\n';
     for (const u of users) {
@@ -190,7 +190,7 @@ export const exportDataCsv = async (req, res) => {
 
     csvContent += '\n';
 
-    // ── 3. Orders ───────────────────────────────────────────────────────────
+    
     csvContent += '=== ORDERS ===\n';
     csvContent += 'Order ID,Username,Email,Total (INR),Status,Date Ordered,Date Delivered,Return Reason\n';
     for (const o of orders) {
@@ -208,7 +208,7 @@ export const exportDataCsv = async (req, res) => {
 
     csvContent += '\n';
 
-    // ── 4. Reviews ──────────────────────────────────────────────────────────
+    
     csvContent += '=== REVIEWS ===\n';
     csvContent += 'Review ID,Username,Item Name,Rating,Comment,Verified,Date Posted\n';
     for (const r of reviews) {
@@ -223,7 +223,7 @@ export const exportDataCsv = async (req, res) => {
       ].join(',') + '\n';
     }
 
-    // Summary footer
+    
     csvContent += `\n=== SUMMARY ===\n`;
     csvContent += `Items,${items.length}\n`;
     csvContent += `Users,${users.length}\n`;
@@ -241,7 +241,7 @@ export const exportDataCsv = async (req, res) => {
   }
 };
 
-// Update product stock
+
 export const updateAdminProductStock = async (req, res) => {
   try {
     const { stock } = req.body;
@@ -261,7 +261,7 @@ export const updateAdminProductStock = async (req, res) => {
   }
 };
 
-// Delete a product
+
 export const deleteAdminProduct = async (req, res) => {
   try {
     const item = await Item.findByIdAndDelete(req.params.id);

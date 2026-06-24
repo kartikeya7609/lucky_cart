@@ -28,21 +28,21 @@ import {
 const SellerPanel = () => {
   const { token, user, addToast } = useAuth();
   
-  // Tabs
+  
   const [activeTab, setActiveTab] = useState('inventory');
 
-  // Listings data
+  
   const [myItems, setMyItems] = useState([]);
   const [sellerOrders, setSellerOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState(null);
 
-  // Inventory Search & Pagination
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Filter & Paginate items
+  
   const filteredItems = myItems.filter(item => 
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.barcode && item.barcode.includes(searchQuery))
@@ -50,7 +50,7 @@ const SellerPanel = () => {
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Edit Modal State
+  
   const [showEditModal, setShowEditModal] = useState(false);
   const [editItemId, setEditItemId] = useState('');
   const [editItemName, setEditItemName] = useState('');
@@ -59,7 +59,7 @@ const SellerPanel = () => {
   const [editImageUrl, setEditImageUrl] = useState('');
   const [editFile, setEditFile] = useState(null);
 
-  // Add Item State
+  
   const [addName, setAddName] = useState('');
   const [addPrice, setAddPrice] = useState('');
   const [addStock, setAddStock] = useState('');
@@ -69,7 +69,7 @@ const SellerPanel = () => {
   const [addImageUrl, setAddImageUrl] = useState('');
   const [addFile, setAddFile] = useState(null);
 
-  // CSV Bulk Upload State
+  
   const [csvFile, setCsvFile] = useState(null);
   const [uploadResult, setUploadResult] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -78,11 +78,11 @@ const SellerPanel = () => {
     if (!token) return;
     setLoading(true);
     try {
-      // 1. Fetch my listings (requesting a high limit to get all items without pagination)
+      
       const resListings = await api.get('/items/my-listings?limit=1000', token);
       setMyItems(Array.isArray(resListings) ? resListings : (resListings?.items || []));
 
-      // 2. Fetch seller-specific orders (correct endpoint)
+      
       const resOrders = await api.get('/orders/seller-orders', token);
       setSellerOrders(Array.isArray(resOrders) ? resOrders : []);
     } catch (err) {
@@ -96,7 +96,7 @@ const SellerPanel = () => {
     fetchSellerData();
   }, [token]);
 
-  // Handle Edit Modal Trigger
+  
   const triggerEdit = (item) => {
     setEditItemId(item._id);
     setEditItemName(item.name);
@@ -107,7 +107,7 @@ const SellerPanel = () => {
     setShowEditModal(true);
   };
 
-  // Submit Edit Listing
+  
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -126,7 +126,7 @@ const SellerPanel = () => {
     }
   };
 
-  // Submit Add Listing
+  
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -143,7 +143,7 @@ const SellerPanel = () => {
       const res = await api.post('/items', formData, token, true);
       addToast(res.message, 'success');
       
-      // Reset form
+      
       setAddName('');
       setAddPrice('');
       setAddStock('');
@@ -160,7 +160,7 @@ const SellerPanel = () => {
     }
   };
 
-  // Submit Bulk Upload
+  
   const handleCsvSubmit = async (e) => {
     e.preventDefault();
     if (!csvFile) return;
@@ -183,7 +183,7 @@ const SellerPanel = () => {
     }
   };
 
-  // Process order updates (Accepted, Rejected, Shipped, Delivered, Cancelled)
+  
   const handleStatusUpdate = async (orderId, newStatus) => {
     try {
       const res = await api.put(`/orders/status/${orderId}`, { status: newStatus }, token);
@@ -194,7 +194,7 @@ const SellerPanel = () => {
     }
   };
 
-  // Respond to buyer's cancellation request
+  
   const handleCancelResponse = async (orderId, action) => {
     const confirmMsg = action === 'accept'
       ? 'Accept this cancellation? The buyer will be refunded immediately.'
@@ -209,7 +209,7 @@ const SellerPanel = () => {
     }
   };
 
-  // Respond to buyer's return request
+  
   const handleReturnResponse = async (orderId, action) => {
     const confirmMsg = action === 'accept'
       ? 'Accept this return? Stock will be restored and the buyer refunded immediately.'
@@ -226,7 +226,7 @@ const SellerPanel = () => {
 
 
   const handleDownloadTemplate = () => {
-    // Point directly to backend CSV template route
+    
     window.open('/api/items/csv-template', '_blank');
   };
 
@@ -237,7 +237,7 @@ const SellerPanel = () => {
         <p className="text-gray-500 text-sm font-bold uppercase tracking-widest">Manage your active listings and fulfill pending orders.</p>
       </div>
 
-      {/* Tabs list */}
+      
       <div className="flex flex-wrap justify-center border-b border-white/5 mb-8 gap-2">
         <button 
           onClick={() => setActiveTab('inventory')}
@@ -276,7 +276,7 @@ const SellerPanel = () => {
         </button>
       </div>
 
-      {/* Active Inventory tab */}
+      
       {activeTab === 'inventory' && (
         <div>
           {loading ? (
@@ -287,7 +287,7 @@ const SellerPanel = () => {
             </div>
           ) : (
             <div>
-              {/* Search Bar */}
+              
               <div className="flex items-center gap-3 bg-[#121418] border border-[#2A2F36] rounded-xl px-4 py-3 mb-6 w-full max-w-md mx-auto">
                 <Search size={16} className="text-gray-500" />
                 <input 
@@ -337,7 +337,7 @@ const SellerPanel = () => {
                 </div>
               )}
 
-              {/* Pagination Controls */}
+              
               {totalPages > 1 && (
                 <div className="flex items-center justify-center gap-4 mt-6 mb-4">
                   <button
@@ -370,7 +370,7 @@ const SellerPanel = () => {
         </div>
       )}
 
-      {/* Sales & Fulfillment tab */}
+      
       {activeTab === 'sales' && (
         <div>
           {loading ? (
@@ -386,7 +386,7 @@ const SellerPanel = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Summary Stats */}
+              
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 {[
                   { label: 'Total Orders', value: sellerOrders.length, color: 'text-white' },
@@ -433,7 +433,7 @@ const SellerPanel = () => {
                         : 'border-white/10'
                     }`}
                   >
-                    {/* ── Order Header ── */}
+                    
                     <div
                       className={`p-5 flex flex-wrap items-center justify-between gap-4 cursor-pointer transition-colors ${
                         isReturnReq ? 'bg-orange-500/5' : isCancelReq ? 'bg-amber-500/5' : 'bg-[#16191D] hover:bg-white/[0.02]'
@@ -478,11 +478,11 @@ const SellerPanel = () => {
                       </div>
                     </div>
 
-                    {/* ── Expanded Details ── */}
+                    
                     {isExpanded && (
                       <div className="border-t border-white/5 bg-[#13161A]">
 
-                        {/* Return Request Alert Banner */}
+                        
                         {isReturnReq && (
                           <div className="px-6 py-4 bg-orange-500/8 border-b border-orange-500/20 flex flex-wrap items-center justify-between gap-4">
                             <div>
@@ -511,7 +511,7 @@ const SellerPanel = () => {
                           </div>
                         )}
 
-                        {/* Cancellation Alert Banner */}
+                        
                         {isCancelReq && (
                           <div className="px-6 py-4 bg-amber-500/8 border-b border-amber-500/20 flex flex-wrap items-center justify-between gap-4">
                             <div>
@@ -535,7 +535,7 @@ const SellerPanel = () => {
                           </div>
                         )}
 
-                        {/* Refund Banner */}
+                        
                         {(order.status === 'Cancelled' || order.status === 'Rejected') && (
                           <div className="px-6 py-3 bg-red-500/5 border-b border-red-500/10 flex items-center gap-3">
                             <XCircle size={16} className="text-red-400 flex-shrink-0" />
@@ -548,7 +548,7 @@ const SellerPanel = () => {
 
                         <div className="grid md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-white/5">
 
-                          {/* ── My Items in this Order ── */}
+                          
                           <div className="p-5 md:col-span-1">
                             <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3">My Products in Order</p>
                             <div className="space-y-3">
@@ -576,7 +576,7 @@ const SellerPanel = () => {
                             </div>
                           </div>
 
-                          {/* ── Buyer Info ── */}
+                          
                           <div className="p-5 md:col-span-1">
                             <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3">Buyer Details</p>
                             <div className="space-y-2.5">
@@ -607,7 +607,7 @@ const SellerPanel = () => {
                             </div>
                           </div>
 
-                          {/* ── Actions & Timeline ── */}
+                          
                           <div className="p-5 md:col-span-1 flex flex-col gap-4">
                             <div>
                               <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3">Order Timeline</p>
@@ -628,7 +628,7 @@ const SellerPanel = () => {
                               </div>
                             </div>
 
-                            {/* Action Buttons */}
+                            
                             {!isCancelReq && (
                               <div className="flex flex-col gap-2 mt-auto">
                                 {order.status === 'Ordered' && (
@@ -682,7 +682,7 @@ const SellerPanel = () => {
         </div>
       )}
 
-      {/* List New Asset tab */}
+      
       {activeTab === 'add' && (
         <div className="max-w-lg mx-auto bg-[#16191D] border border-white/5 rounded-[2rem] p-8 shadow-2xl">
           <h2 className="text-xl font-black text-white uppercase tracking-wider mb-6">List a New Item</h2>
@@ -795,17 +795,17 @@ const SellerPanel = () => {
       )}
 
 
-      {/* Bulk CSV Upload tab */}
+      
       {activeTab === 'bulk' && (
         <div className="max-w-2xl mx-auto space-y-6">
 
-          {/* Header */}
+          
           <div className="text-center">
             <h2 className="text-2xl font-black text-white uppercase tracking-wider">Bulk CSV Upload</h2>
             <p className="text-xs text-gray-500 mt-1">Upload multiple products at once using the template below</p>
           </div>
 
-          {/* Column Reference Table */}
+          
           <div className="bg-[#16191D] border border-white/5 rounded-2xl overflow-hidden">
             <div className="px-5 py-3 border-b border-white/5 flex flex-wrap items-center justify-between gap-3">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">CSV Column Reference</p>
@@ -853,7 +853,7 @@ const SellerPanel = () => {
             </div>
           </div>
 
-          {/* Drag & Drop Upload Zone */}
+          
           <form onSubmit={handleCsvSubmit}>
             <label
               htmlFor="csv-file-input"
@@ -924,7 +924,7 @@ const SellerPanel = () => {
             )}
           </form>
 
-          {/* Upload Result Summary */}
+          
           {uploadResult && (
             <div className={`rounded-2xl border p-5 ${
               uploadResult.errorsCount > 0

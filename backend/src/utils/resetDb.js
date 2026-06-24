@@ -1,18 +1,4 @@
-/**
- * ─────────────────────────────────────────────────────────────────
- *  Lucky Cart — Database Reset Script
- *  Run: node src/utils/resetDb.js
- *
- *  What it wipes (every collection except Users):
- *    Items, CartItems, Orders, OrderItems,
- *    Wishlists, WishlistItems, Addresses,
- *    Coupons, Notifications, ViewedItems, Reviews
- *
- *  Users are KEPT by default.
- *  Pass --users flag to also wipe all user accounts:
- *    node src/utils/resetDb.js --users
- * ─────────────────────────────────────────────────────────────────
- */
+
 
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
@@ -64,7 +50,7 @@ async function resetDatabase() {
 
   for (const { name, model } of RESET_TARGETS) {
     try {
-      const result = await model.deleteMany({});
+      const result = await model.deleteMany();
       const count = result.deletedCount;
       totalDeleted += count;
       const icon = count > 0 ? '🗑️ ' : '✅';

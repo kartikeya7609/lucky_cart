@@ -9,7 +9,7 @@ import {
   TrendingUp, Shield, Truck, RotateCcw, Pencil, Trash2, X
 } from 'lucide-react';
 
-/* ─── JsBarcode loader (CDN) ─────────────────────────────── */
+
 const loadJsBarcode = () =>
   new Promise((resolve) => {
     if (window.JsBarcode) return resolve(window.JsBarcode);
@@ -19,7 +19,7 @@ const loadJsBarcode = () =>
     document.head.appendChild(script);
   });
 
-/* ─── Barcode component ───────────────────────────────────── */
+
 const BarcodeDisplay = ({ value }) => {
   const svgRef = useRef(null);
   const [error, setError] = useState(false);
@@ -80,7 +80,7 @@ const BarcodeDisplay = ({ value }) => {
   );
 };
 
-/* ─── Star renderer ───────────────────────────────────────── */
+
 const Stars = ({ count = 0, size = 16, interactive = false, onSelect }) => (
   <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
     {Array.from({ length: 5 }, (_, i) => {
@@ -101,7 +101,7 @@ const Stars = ({ count = 0, size = 16, interactive = false, onSelect }) => (
   </div>
 );
 
-/* ─── Main component ──────────────────────────────────────── */
+
 const ItemDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -119,13 +119,13 @@ const ItemDetail = () => {
   const [reviewImage, setReviewImage] = useState(null);
   const [reviewImagePreview, setReviewImagePreview] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
-  const [replies, setReplies] = useState({});
+  const [replies, setReplies] = useState();
 
   const [cartBusy, setCartBusy] = useState(false);
   const [wishBusy, setWishBusy] = useState(false);
   const [cartAdded, setCartAdded] = useState(false);
 
-  // Edit review state
+  
   const [editingReviewId, setEditingReviewId] = useState(null);
   const [editRating, setEditRating] = useState(5);
   const [editComment, setEditComment] = useState('');
@@ -148,7 +148,7 @@ const ItemDetail = () => {
 
   useEffect(() => { fetchDetails(); }, [id, sortReviews]);
 
-  /* ─── Cart ────────────────────────────────────────────── */
+  
   const handleAddToCart = async () => {
     if (!token) {
       addToast('Please log in to add items to your cart.', 'warning');
@@ -170,7 +170,7 @@ const ItemDetail = () => {
     }
   };
 
-  /* ─── Wishlist ────────────────────────────────────────── */
+  
   const handleAddToWishlist = async () => {
     if (!token) {
       addToast('Please log in to manage your wishlist.', 'warning');
@@ -178,7 +178,7 @@ const ItemDetail = () => {
     }
     setWishBusy(true);
     try {
-      const data = await api.post(`/wishlist/add/${id}`, {}, token);
+      const data = await api.post(`/wishlist/add/${id}`, , token);
       addToast(data.message || 'Added to wishlist!', 'success');
     } catch (err) {
       addToast(err?.message || 'Failed to update wishlist', 'danger');
@@ -187,7 +187,7 @@ const ItemDetail = () => {
     }
   };
 
-  /* ─── Review ──────────────────────────────────────────── */
+  
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!comment.trim()) return;
@@ -211,7 +211,7 @@ const ItemDetail = () => {
     }
   };
 
-  /* ─── Reply ───────────────────────────────────────────── */
+  
   const handleReplySubmit = async (e, reviewId) => {
     e.preventDefault();
     const replyText = replies[reviewId];
@@ -226,7 +226,7 @@ const ItemDetail = () => {
     }
   };
 
-  /* ─── Delete Review ─────────────────────────────────────── */
+  
   const handleDeleteReview = async (reviewId) => {
     if (!window.confirm('Delete this review? This cannot be undone.')) return;
     try {
@@ -238,7 +238,7 @@ const ItemDetail = () => {
     }
   };
 
-  /* ─── Start / Cancel Edit ───────────────────────────────── */
+  
   const startEdit = (review) => {
     setEditingReviewId(review._id || review.id);
     setEditRating(review.rating);
@@ -253,7 +253,7 @@ const ItemDetail = () => {
     setEditImagePreview(null);
   };
 
-  /* ─── Save Edited Review ────────────────────────────────── */
+  
   const handleEditSave = async (e, reviewId) => {
     e.preventDefault();
     if (!editComment.trim()) return;
@@ -271,7 +271,7 @@ const ItemDetail = () => {
     }
   };
 
-  /* ─── Delete Seller Reply ───────────────────────────────── */
+  
   const handleDeleteReply = async (reviewId) => {
     if (!window.confirm('Delete your reply?')) return;
     try {
@@ -324,7 +324,7 @@ const ItemDetail = () => {
 
   const avgRating = (item.average_rating || 0).toFixed(1);
 
-  /* ─── Render ──────────────────────────────────────────── */
+  
   return (
     <div style={{ backgroundColor: '#0F1115', minHeight: '100vh', color: '#ffffff' }}>
       <style>{`
@@ -340,7 +340,7 @@ const ItemDetail = () => {
 
       <div style={{ maxWidth: '88rem', margin: '0 auto', padding: '2.5rem 1.5rem 5rem' }}>
 
-        {/* ── Back nav ─────────────────────────────────── */}
+        
         <button
           onClick={() => navigate(-1)}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#6B7280', background: 'none', border: 'none', fontWeight: '800', fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', cursor: 'pointer', marginBottom: '2.5rem', padding: 0, transition: 'color 0.2s' }}
@@ -350,10 +350,10 @@ const ItemDetail = () => {
           <ArrowLeft size={15} /> Back to marketplace
         </button>
 
-        {/* ── Hero: Image + Info ────────────────────────── */}
+        
         <div className="detail-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '3rem', marginBottom: '5rem', alignItems: 'start' }}>
 
-          {/* Image panel */}
+          
           <div style={{
             position: 'relative',
             backgroundColor: '#16191D',
@@ -366,7 +366,7 @@ const ItemDetail = () => {
             minHeight: '420px',
             overflow: 'hidden',
           }}>
-            {/* Subtle glow behind image */}
+            
             <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 60%, rgba(59,130,246,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
             <img
               src={item.user_file}
@@ -383,10 +383,10 @@ const ItemDetail = () => {
             )}
           </div>
 
-          {/* Info panel */}
+          
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-            {/* Category + rating row */}
+            
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <span style={{ backgroundColor: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', padding: '0.25rem 0.875rem', borderRadius: '9999px', fontSize: '0.65rem', fontWeight: '800', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                 {item.category}
@@ -399,12 +399,12 @@ const ItemDetail = () => {
               </div>
             </div>
 
-            {/* Product name */}
+            
             <h1 style={{ fontSize: 'clamp(1.75rem, 4vw, 2.75rem)', fontWeight: '900', letterSpacing: '-0.03em', textTransform: 'uppercase', lineHeight: 1.05, margin: 0 }}>
               {item.name}
             </h1>
 
-            {/* Price */}
+            
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '2.25rem', fontWeight: '900', color: '#4ade80', letterSpacing: '-0.03em' }}>
                 ₹{item.price.toFixed(2)}
@@ -421,12 +421,12 @@ const ItemDetail = () => {
               )}
             </div>
 
-            {/* Description */}
+            
             <p style={{ color: '#9CA3AF', fontSize: '0.9375rem', lineHeight: '1.65', margin: 0, fontWeight: '500' }}>
               {item.description}
             </p>
 
-            {/* CTA buttons */}
+            
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               {(isConsumer || !user) && (
                 <button
@@ -495,7 +495,7 @@ const ItemDetail = () => {
               )}
             </div>
 
-            {/* Trust badges */}
+            
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', paddingTop: '0.5rem' }}>
               {[
                 { icon: <Truck size={13} />, label: 'Fast Delivery' },
@@ -508,7 +508,7 @@ const ItemDetail = () => {
               ))}
             </div>
 
-            {/* Meta grid */}
+            
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
               <div>
                 <p style={{ fontSize: '0.6rem', fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.35rem' }}>Availability</p>
@@ -521,16 +521,16 @@ const ItemDetail = () => {
                 <p style={{ fontWeight: '800', margin: 0, color: '#60a5fa', fontSize: '0.9rem' }}>{item.seller?.username || 'System Partner'}</p>
               </div>
 
-              {/* ── Barcode ── */}
+              
               {item.barcode && <BarcodeDisplay value={item.barcode} />}
             </div>
           </div>
         </div>
 
-        {/* ── Reviews section ───────────────────────────── */}
+        
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '3rem', alignItems: 'start' }}>
 
-          {/* Review form */}
+          
           <div style={{ position: 'sticky', top: '1.5rem' }}>
             <div style={{ backgroundColor: '#16191D', padding: '2rem', borderRadius: '1.75rem', border: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.75rem' }}>
@@ -590,48 +590,7 @@ const ItemDetail = () => {
                     >
                       <input
                         type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (!file) return;
-                          setReviewImage(file);
-                          setReviewImagePreview(URL.createObjectURL(file));
-                        }}
-                      />
-                      <span style={{ fontSize: '0.75rem', color: reviewImage ? '#4ade80' : '#6B7280', fontWeight: '600' }}>
-                        {reviewImage ? `✓ ${reviewImage.name}` : 'Click to choose an image…'}
-                      </span>
-                    </label>
-                    {reviewImagePreview && (
-                      <div style={{ position: 'relative', marginTop: '0.75rem', borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <img src={reviewImagePreview} alt="Preview" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', display: 'block' }} />
-                        <button
-                          type="button"
-                          onClick={() => { setReviewImage(null); setReviewImagePreview(null); }}
-                          style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'rgba(0,0,0,0.7)', border: 'none', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: '900', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >✕</button>
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={submittingReview}
-                    style={{ width: '100%', padding: '0.9rem', background: submittingReview ? 'rgba(59,130,246,0.4)' : 'linear-gradient(135deg, #3b82f6, #4f46e5)', border: 'none', color: '#ffffff', fontWeight: '800', borderRadius: '0.75rem', cursor: submittingReview ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', transition: 'opacity 0.2s' }}
-                  >
-                    {submittingReview ? (
-                      <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} /> Posting…</>
-                    ) : (
-                      <><Send size={14} /> Post Review</>
-                    )}
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
-
-          {/* Reviews list */}
+                        accept="image}
           <div style={{ gridColumn: 'span 1' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
@@ -671,7 +630,7 @@ const ItemDetail = () => {
                   return (
                     <div key={rid} className="review-card" style={{ backgroundColor: '#16191D', padding: '1.75rem', borderRadius: '1.5rem', border: `1px solid ${isEditing ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.04)'}`, transition: 'border-color 0.2s' }}>
 
-                      {/* ── Header ── */}
+                      
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '1rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
                           <div style={{ width: '2.75rem', height: '2.75rem', borderRadius: '50%', background: 'linear-gradient(135deg, #1e3a5f, #1e1b4b)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', border: '1px solid rgba(255,255,255,0.08)', fontSize: '1rem', color: '#60a5fa', flexShrink: 0 }}>
@@ -686,7 +645,7 @@ const ItemDetail = () => {
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {/* Verified badge + stars */}
+                          
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
                             <Stars count={review.rating} size={13} />
                             {review.is_verified && (
@@ -697,7 +656,7 @@ const ItemDetail = () => {
                             )}
                           </div>
 
-                          {/* Action buttons */}
+                          
                           {!isEditing && (isMyReview || canDelete) && (
                             <div style={{ display: 'flex', gap: '0.35rem', marginLeft: '0.5rem' }}>
                               {isMyReview && (
@@ -727,7 +686,7 @@ const ItemDetail = () => {
                         </div>
                       </div>
 
-                      {/* ── Inline Edit Form ── */}
+                      
                       {isEditing ? (
                         <form onSubmit={(e) => handleEditSave(e, rid)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem', backgroundColor: 'rgba(59,130,246,0.04)', borderRadius: '1rem', border: '1px solid rgba(59,130,246,0.12)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
@@ -737,13 +696,13 @@ const ItemDetail = () => {
                             </button>
                           </div>
 
-                          {/* Rating */}
+                          
                           <div>
                             <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: '800', color: '#4B5563', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.4rem' }}>Rating</label>
                             <Stars count={editRating} size={24} interactive onSelect={setEditRating} />
                           </div>
 
-                          {/* Comment */}
+                          
                           <div>
                             <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: '800', color: '#4B5563', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.4rem' }}>Review</label>
                             <textarea
@@ -755,23 +714,11 @@ const ItemDetail = () => {
                             />
                           </div>
 
-                          {/* New image */}
+                          
                           <div>
                             <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: '800', color: '#4B5563', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.4rem' }}>Replace Photo (optional)</label>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: '#0F1115', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '0.625rem', padding: '0.6rem 0.875rem', cursor: 'pointer' }}>
-                              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files[0]; if (!f) return; setEditImage(f); setEditImagePreview(URL.createObjectURL(f)); }} />
-                              <span style={{ fontSize: '0.75rem', color: editImage ? '#4ade80' : '#6B7280', fontWeight: '600' }}>
-                                {editImage ? `✓ ${editImage.name}` : 'Click to choose…'}
-                              </span>
-                            </label>
-                            {editImagePreview && (
-                              <div style={{ marginTop: '0.5rem', borderRadius: '0.625rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '140px' }}>
-                                <img src={editImagePreview} alt="Preview" style={{ width: '100%', maxHeight: '140px', objectFit: 'cover', display: 'block' }} />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Actions */}
+                              <input type="file" accept="image}
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button type="submit" style={{ flex: 1, padding: '0.6rem', background: 'linear-gradient(135deg, #3b82f6, #4f46e5)', border: 'none', color: '#fff', fontWeight: '800', borderRadius: '0.625rem', cursor: 'pointer', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                               Save Changes
@@ -793,7 +740,7 @@ const ItemDetail = () => {
                             </div>
                           )}
 
-                          {/* Seller reply */}
+                          
                           {review.seller_reply ? (
                             <div style={{ backgroundColor: 'rgba(59,130,246,0.04)', padding: '1.25rem', borderRadius: '0.875rem', border: '1px solid rgba(59,130,246,0.12)' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>

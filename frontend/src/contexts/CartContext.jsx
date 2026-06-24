@@ -16,7 +16,7 @@ export const CartProvider = ({ children }) => {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Fetch cart data from API
+  
   const fetchCart = async (coupon = null) => {
     if (!token || (user && user.role === 'seller')) return;
     setLoading(true);
@@ -32,7 +32,7 @@ export const CartProvider = ({ children }) => {
       setEstDelivery(data.estDelivery || '');
       setAppliedCoupon(data.appliedCoupon || null);
 
-      // Handle stock and expiration notices
+      
       if (data.messages && data.messages.length > 0) {
         data.messages.forEach(msg => addToast(msg, 'warning'));
       }
@@ -55,7 +55,7 @@ export const CartProvider = ({ children }) => {
     }
   }, [token, user]);
 
-  // Add Item to Cart
+  
   const addToCart = async (itemId) => {
     if (!token) {
       addToast('Please login to purchase items.', 'warning');
@@ -72,7 +72,7 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // Remove Item from Cart
+  
   const removeFromCart = async (cartItemId) => {
     try {
       const data = await api.delete(`/cart/${cartItemId}`, token);
@@ -85,10 +85,10 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // Move Cart Item to Wishlist
+  
   const saveForLater = async (cartItemId) => {
     try {
-      const data = await api.post(`/cart/save-for-later/${cartItemId}`, {}, token);
+      const data = await api.post(`/cart/save-for-later/${cartItemId}`, , token);
       addToast(data.message || 'Saved for later.', 'info');
       await fetchCart();
       return true;
@@ -98,7 +98,7 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // Apply Coupon
+  
   const applyCouponCode = async (code) => {
     try {
       const data = await api.post('/cart/apply-coupon', { coupon_code: code }, token);
@@ -112,7 +112,7 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // Process Checkout
+  
   const checkoutCart = async (addressId) => {
     try {
       const payload = { addressId };
@@ -121,14 +121,14 @@ export const CartProvider = ({ children }) => {
       const data = await api.post('/cart/checkout', payload, token);
       addToast(data.message || 'Checkout successful!', 'success');
       
-      // Clear local states
+      
       setCartItems([]);
       setSubtotal(0);
       setDiscount(0);
       setTotal(0);
       setAppliedCoupon(null);
 
-      // Refresh buyer budget
+      
       await refreshUser();
       
       return { success: true, orderId: data.orderId };

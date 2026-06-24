@@ -32,15 +32,15 @@ const Navbar = () => {
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const notifRef = useRef(null);
 
-  // PWA Install Prompt State
+  
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstallable, setIsInstallable] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
-      // Prevent Chrome 67 and earlier from automatically showing the prompt
+      
       e.preventDefault();
-      // Stash the event so it can be triggered later.
+      
       setDeferredPrompt(e);
       setIsInstallable(true);
     };
@@ -65,25 +65,23 @@ const Navbar = () => {
   const isActive = (path) => location.pathname === path;
   const totalCartQty = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
-  /* ── Fetch notifications ─────────────────────────────── */
+  
   const fetchNotifications = async () => {
     if (!token || !user || user.role === 'admin') return;
     try {
       const data = await api.get('/orders/notifications', token);
       setNotifications(data.notifications || []);
       setUnreadCount(data.unreadCount || 0);
-    } catch {
-      // Silent fail — don't disrupt UI
-    }
+    } catch 
   };
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // poll every 30s
+    const interval = setInterval(fetchNotifications, 30000); 
     return () => clearInterval(interval);
   }, [token, user]);
 
-  /* ── Close panel when clicking outside ──────────────── */
+  
   useEffect(() => {
     const handler = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
@@ -94,21 +92,19 @@ const Navbar = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  /* ── Open panel + mark all read ─────────────────────── */
+  
   const handleBellClick = async () => {
     setShowNotifPanel((prev) => !prev);
     if (!showNotifPanel && unreadCount > 0) {
       try {
-        await api.post('/orders/notifications/mark-read', {}, token);
+        await api.post('/orders/notifications/mark-read', , token);
         setUnreadCount(0);
         setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-      } catch {
-        // Silent fail
-      }
+      } catch 
     }
   };
 
-  /* ── Helpers ─────────────────────────────────────────── */
+  
   const isCancellationNotif = (msg) => msg?.includes('Cancellation Request') || msg?.includes('cancellation');
   const timeAgo = (dateStr) => {
     const diff = Date.now() - new Date(dateStr);
@@ -126,7 +122,7 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
 
-          {/* Logo */}
+          
           <div className="flex items-center gap-12">
             <Link to="/market" className="flex items-center group">
               <div className="w-10 h-10 bg-gradient-to-tr from-green-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(52,211,153,0.3)] group-hover:rotate-12 group-hover:scale-110 transition-all duration-300">
@@ -138,7 +134,7 @@ const Navbar = () => {
               </div>
             </Link>
 
-            {/* Main Nav Links */}
+            
             <div className="hidden lg:block">
               <ul className="flex items-center gap-2">
                 <li>
@@ -253,10 +249,10 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Right Controls */}
+          
           <div className="flex items-center gap-3">
             
-            {/* ── PWA Install Button ──────────────────────── */}
+            
             {isInstallable && (
               <button 
                 onClick={handleInstallClick}
@@ -266,7 +262,7 @@ const Navbar = () => {
               </button>
             )}
 
-            {/* ── Notification Bell ─────────────────────── */}
+            
             {user && user.role !== 'admin' && (
               <div className="relative" ref={notifRef}>
                 <button
@@ -286,10 +282,10 @@ const Navbar = () => {
                   )}
                 </button>
 
-                {/* Dropdown Panel */}
+                
                 {showNotifPanel && (
                   <div className="fixed top-16 right-4 left-4 sm:absolute sm:top-12 sm:right-0 sm:left-auto w-auto sm:w-80 max-h-[70vh] sm:max-h-[420px] overflow-y-auto bg-[#16191D] border border-white/10 rounded-2xl shadow-2xl shadow-black/50 z-[200]">
-                    {/* Header */}
+                    
                     <div className="sticky top-0 bg-[#16191D] px-4 py-3 border-b border-white/5 flex items-center justify-between">
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Notifications</span>
                       {notifications.some((n) => !n.is_read) && (
@@ -353,7 +349,7 @@ const Navbar = () => {
                       </div>
                     )}
 
-                    {/* Footer — for sellers with cancellation requests */}
+                    
                     {user?.role === 'seller' && notifications.some((n) => isCancellationNotif(n.message) && !n.is_read) && (
                       <div className="sticky bottom-0 bg-[#16191D] px-4 py-3 border-t border-white/5">
                         <Link
@@ -370,7 +366,7 @@ const Navbar = () => {
               </div>
             )}
 
-            {/* ── User Pill ──────────────────────────────── */}
+            
             {user ? (
               <div className="flex items-center gap-3 pl-3 pr-1.5 py-1.5 bg-[#16191D] border border-white/5 rounded-2xl shadow-xl">
                 <div className="flex flex-col items-end">
@@ -415,7 +411,7 @@ const Navbar = () => {
       </div>
     </nav>
 
-    {/* ── Mobile Bottom Navigation ── */}
+    
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0F1115]/95 backdrop-blur-xl border-t border-white/10 pb-safe">
       <div className="flex items-center justify-around h-16 px-2">
         <Link 

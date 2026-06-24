@@ -19,7 +19,7 @@ const PublicWishlist = () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch public wishlist using optional token
+      
       const data = await api.get(`/wishlist/public/${username}`, token);
       setWishlistData(data);
     } catch (err) {

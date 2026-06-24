@@ -11,12 +11,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
-  // Toast system
+  
   const addToast = (message, type = 'info') => {
     const id = Date.now() + Math.random().toString(36).substr(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
     
-    // Auto-remove toast after 4 seconds
+    
     setTimeout(() => {
       removeToast(id);
     }, 4000);
@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Fetch current user details on load
+  
   const loadUser = async (authToken) => {
     try {
       const userData = await api.get('/auth/me', authToken);
@@ -47,9 +47,9 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
-  // Login handler
+  
   const login = async (usernameOrToken, passwordOrUser) => {
-    // If it's a token, store directly (for admin-login)
+    
     if (typeof usernameOrToken === 'string' && usernameOrToken.split('.').length === 3) {
       const tokenVal = usernameOrToken;
       const userVal = passwordOrUser;
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register handler
+  
   const register = async (formData) => {
     try {
       const data = await api.post('/auth/register', formData);
@@ -100,10 +100,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Logout handler
+  
   const logout = async () => {
     try {
-      if (token) await api.post('/auth/logout', {}, token);
+      if (token) await api.post('/auth/logout', , token);
     } catch (err) {
       console.error("Logout request error", err);
     } finally {
@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Sync / refresh user details (e.g. after budget deductions)
+  
   const refreshUser = async () => {
     if (token) {
       try {

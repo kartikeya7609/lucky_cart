@@ -8,16 +8,16 @@ const Profile = () => {
   const { token, user, addToast, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Dashboard states
+  
   const [stats, setStats] = useState(null);
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal display states
+  
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
 
-  // Address Form States
+  
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [addressLine, setAddressLine] = useState('');
@@ -26,7 +26,7 @@ const Profile = () => {
   const [zipCode, setZipCode] = useState('');
   const [isDefault, setIsDefault] = useState(false);
 
-  // Edit Profile States
+  
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [editForm, setEditForm] = useState({
     full_name: '',
@@ -73,7 +73,7 @@ const Profile = () => {
 
   const handleSetDefaultAddress = async (id) => {
     try {
-      const res = await api.put(`/addresses/default/${id}`, {}, token);
+      const res = await api.put(`/addresses/default/${id}`, , token);
       addToast(res.message, 'success');
       await fetchDashboardData();
     } catch (err) {
@@ -106,7 +106,7 @@ const Profile = () => {
 
       addToast(res.message, 'success');
       
-      // Reset form fields
+      
       setFullName('');
       setPhoneNumber('');
       setAddressLine('');
@@ -138,8 +138,8 @@ const Profile = () => {
       addToast(res.message || 'Profile updated successfully', 'success');
       setShowEditProfileModal(false);
       setProfilePicFile(null);
-      // We force a page reload to update the context, or we could update the AuthContext state directly if the context exposes an update method.
-      // For simplicity, reload to fetch updated user details.
+      
+      
       window.location.reload();
     } catch (err) {
       addToast(err.message || 'Failed to update profile', 'danger');
@@ -162,16 +162,16 @@ const Profile = () => {
     );
   }
 
-  // Set default profile avatar URL
+  
   const avatarUrl = user?.profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'User'}`;
 
   return (
     <div className="min-h-screen bg-[#0F1115] text-white overflow-x-hidden">
       <div className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         
-        {/* Profile Header (Instagram style) */}
+        
         <div className="flex flex-col md:flex-row items-center gap-6 md:gap-16 mb-12">
-          {/* Avatar Ring */}
+          
           <div className="relative group">
             <div className="w-28 h-28 md:w-44 md:h-44 rounded-full p-1 bg-gradient-to-tr from-green-400 via-blue-500 to-purple-600">
               <div className="w-full h-full rounded-full bg-[#0F1115] p-1">
@@ -194,7 +194,7 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Profile Details */}
+          
           <div className="flex-grow text-center md:text-left w-full">
             <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
               <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter">{user?.username}</h2>
@@ -214,7 +214,7 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* Stats list */}
+            
             <div className="flex items-center justify-around md:justify-start gap-4 md:gap-12 py-4 border-y border-white/5 md:border-none">
               <div onClick={() => navigate('/orders')} className="text-center md:text-left group/stat cursor-pointer">
                 <span className="block text-lg md:text-xl font-black group-hover:text-blue-400 transition-colors">{stats?.orderCount || 0}</span>
@@ -239,7 +239,7 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Personal Details Grid (Registration Fields) */}
+        
         <div className="bg-[#16191D] border border-white/5 p-6 md:p-8 rounded-2xl mb-12">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Account Information</h3>
@@ -274,10 +274,10 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Dashboard Grid */}
+        
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-12">
           
-          {/* Loyalty Level Progress */}
+          
           <div className="bg-[#16191D] border border-white/5 p-6 rounded-2xl relative overflow-hidden group">
             <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Loyalty Tier</h3>
             <div className="flex items-end justify-between mb-4">
@@ -292,7 +292,7 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Spending Analytics (Horizontal bars matching template layout) */}
+          
           <div className="bg-[#16191D] border border-white/5 p-6 rounded-2xl group">
             <h3 className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] mb-4">Analytics</h3>
             <div className="flex items-end gap-2 h-16 mb-4">
@@ -314,7 +314,7 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Achievements badge grid */}
+          
           <div className="bg-[#16191D] border border-white/5 p-6 rounded-2xl sm:col-span-2 lg:col-span-1">
             <h3 className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] mb-4">Achievements</h3>
             <div className="flex flex-wrap gap-3">
@@ -330,7 +330,7 @@ const Profile = () => {
 
         </div>
 
-        {/* Navigation Action Buttons Grid */}
+        
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-12">
           <button 
             onClick={() => navigate('/orders')} 
@@ -399,7 +399,7 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Recently Viewed Grid */}
+        
         <div className="border-t border-white/5 pt-12 pb-24">
           <div className="flex items-center justify-between mb-8 px-2">
             <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Recently Viewed</h3>
@@ -435,7 +435,7 @@ const Profile = () => {
 
       </div>
 
-      {/* ADDRESSES MODAL */}
+      
       {showAddressModal && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#16191D] border border-white/10 w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl rounded-2xl">
@@ -450,7 +450,7 @@ const Profile = () => {
             </div>
 
             <div className="p-6 space-y-8">
-              {/* List Current Addresses */}
+              
               <div className="space-y-4">
                 <h4 className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Your Locations</h4>
                 {addresses.length === 0 ? (
@@ -489,7 +489,7 @@ const Profile = () => {
                 )}
               </div>
 
-              {/* Add New Address Form */}
+              
               <div className="pt-8 border-t border-white/5">
                 <h4 className="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-6">Add New Address</h4>
                 <form onSubmit={handleAddAddress} className="grid grid-cols-2 gap-4">
@@ -578,7 +578,7 @@ const Profile = () => {
         </div>
       )}
 
-      {/* NOTIFICATION MODAL */}
+      
       {showNotifModal && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#16191D] border border-white/10 w-full max-w-md max-h-[80vh] overflow-y-auto shadow-2xl rounded-2xl">
@@ -618,7 +618,7 @@ const Profile = () => {
         </div>
       )}
 
-      {/* EDIT PROFILE MODAL */}
+      
       {showEditProfileModal && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#16191D] border border-white/10 w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl rounded-2xl">

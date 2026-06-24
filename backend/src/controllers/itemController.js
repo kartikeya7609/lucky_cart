@@ -4,7 +4,7 @@ import { Readable } from 'stream';
 import { Item, Review, Order, OrderItem, ViewedItem, Notification, User } from '../models/index.js';
 import cloudinary from '../config/cloudinary.js';
 
-// Get all marketplace items (paginated, filtered, sorted)
+
 export const getMarketplaceItems = async (req, res) => {
   const q = req.query.q;
   const categoryFilter = req.query.category;
@@ -14,10 +14,10 @@ export const getMarketplaceItems = async (req, res) => {
   const skip = (page - 1) * limit;
 
   try {
-    // Only fetch items that are in stock
+    
     let queryObj = { stock: { $gt: 0 } };
 
-    // Apply text search query
+    
     if (q) {
       const regex = new RegExp(q, 'i');
       queryObj.$or = [
@@ -27,7 +27,7 @@ export const getMarketplaceItems = async (req, res) => {
       ];
     }
 
-    // Apply category filter
+    
     if (categoryFilter && categoryFilter !== 'All') {
       queryObj.category = categoryFilter;
     }
@@ -35,13 +35,13 @@ export const getMarketplaceItems = async (req, res) => {
     let items;
     let total;
 
-    // Handle Sorting
+    
     if (sort === 'random') {
-      // Fetch all, shuffle in memory, and paginate (matching Flask behavior)
+      
       const allItems = await Item.find(queryObj).populate('seller', 'username');
       total = allItems.length;
       
-      // Fisher-Yates Shuffle
+      
       for (let i = allItems.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
@@ -49,7 +49,7 @@ export const getMarketplaceItems = async (req, res) => {
       
       items = allItems.slice(skip, skip + limit);
     } else {
-      let sortObj = {};
+      let sortObj = ;
       if (sort === 'price_low') sortObj = { price: 1 };
       else if (sort === 'price_high') sortObj = { price: -1 };
       else if (sort === 'name') sortObj = { name: 1 };
@@ -86,7 +86,7 @@ export const getMarketplaceItems = async (req, res) => {
   }
 };
 
-// Get single item detail
+
 export const getItemDetails = async (req, res) => {
   const itemId = req.params.id;
   const userId = req.user ? req.user.id : null;
@@ -98,8 +98,8 @@ export const getItemDetails = async (req, res) => {
       return res.status(404).json({ message: 'Item not found' });
     }
 
-    // Sort reviews
-    let sortObj = {};
+    
+    let sortObj = ;
     if (sort === 'highest') sortObj = { rating: -1 };
     else if (sort === 'lowest') sortObj = { rating: 1 };
     else sortObj = { date_posted: -1 };
@@ -108,21 +108,21 @@ export const getItemDetails = async (req, res) => {
       .populate('user', 'username')
       .sort(sortObj);
 
-    // Check if current user is a verified buyer
+    
     let isVerifiedBuyer = false;
     if (userId && userId !== 'admin') {
-      // Find orders completed by user
+      
       const userOrders = await Order.find({ user: userId });
       const orderIds = userOrders.map(o => o._id);
       
-      // Check if any order contains this item
+      
       const purchased = await OrderItem.findOne({
         order: { $in: orderIds },
         item: itemId
       });
       isVerifiedBuyer = !!purchased;
 
-      // Track item view log (exclude seller of item itself)
+      
       if (item.seller && String(item.seller._id) !== String(userId)) {
         await ViewedItem.findOneAndUpdate(
           { user: userId, item: itemId },
@@ -143,18 +143,18 @@ export const getItemDetails = async (req, res) => {
   }
 };
 
-// Add new item (Seller only)
+
 export const addItem = async (req, res) => {
   const { name, price, barcode, description, category, stock, cloudinary_url } = req.body;
   const sellerId = req.user.id;
 
   try {
-    // Validations
+    
     if (!name || !price || !barcode || !description) {
       return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
-    // Check uniqueness
+    
     const nameExists = await Item.findOne({ name });
     if (nameExists) return res.status(400).json({ message: 'Product name already exists!' });
 
@@ -165,7 +165,7 @@ export const addItem = async (req, res) => {
     if (cloudinary_url) {
       imageUrl = cloudinary_url;
     } else if (req.file) {
-      // Handle file upload to Cloudinary
+      
       try {
         const uploadResult = await new Promise((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(
@@ -202,7 +202,7 @@ export const addItem = async (req, res) => {
   }
 };
 
-// Edit existing item (Seller only)
+
 export const editItem = async (req, res) => {
   const itemId = req.params.id;
   const sellerId = req.user.id;
@@ -223,15 +223,15 @@ export const editItem = async (req, res) => {
 
     const oldPrice = item.price;
 
-    // Price reduction check
+    
     if (newPrice !== oldPrice) {
       if (newPrice < oldPrice) {
-        // Set original price for strikethrough if not already set, or if old price is higher than current original price
+        
         if (!item.original_price || item.original_price < oldPrice) {
           item.original_price = oldPrice;
         }
 
-        // Notify all users who viewed this item (excluding the seller)
+        
         const viewedUsers = await ViewedItem.find({ item: itemId }).distinct('user');
         
         for (const uId of viewedUsers) {
@@ -244,7 +244,7 @@ export const editItem = async (req, res) => {
           }
         }
       } else if (newPrice >= (item.original_price || oldPrice)) {
-        // Clear original price if updated back to normal or higher
+        
         item.original_price = undefined;
       }
       item.price = newPrice;
@@ -252,7 +252,7 @@ export const editItem = async (req, res) => {
 
     item.stock = newStock;
 
-    // Update image
+    
     if (cloudinary_url) {
       item.user_file = cloudinary_url;
     } else if (req.file) {
@@ -281,7 +281,7 @@ export const editItem = async (req, res) => {
   }
 };
 
-// Get listings for current seller
+
 export const getMyListings = async (req, res) => {
   const sellerId = req.user.id;
   const page = parseInt(req.query.page) || 1;
@@ -310,7 +310,7 @@ export const getMyListings = async (req, res) => {
   }
 };
 
-// Bulk CSV Upload
+
 export const uploadCsv = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Please upload a CSV file' });
@@ -319,7 +319,7 @@ export const uploadCsv = async (req, res) => {
   const sellerId = req.user.id;
   const successItems = [];
   const errors = [];
-  let rowIdx = 1; // start index matching csv parser index
+  let rowIdx = 1; 
 
   try {
     const fileContent = req.file.buffer.toString('utf-8');
@@ -327,7 +327,7 @@ export const uploadCsv = async (req, res) => {
       return res.status(400).json({ message: 'The uploaded CSV file is empty.' });
     }
 
-    // Synonym groups
+    
     const nameSyns = ['name', 'item_name', 'product_name', 'title', 'item', 'product'];
     const barcodeSyns = ['barcode', 'bar_code', 'upc', 'sku', 'code'];
     const priceSyns = ['price', 'cost', 'rate', 'mrp', 'amount'];
@@ -346,7 +346,7 @@ export const uploadCsv = async (req, res) => {
       return defaultVal;
     };
 
-    // Find headers row and clean headers
+    
     const lines = fileContent.split(/\r?\n/);
     let headerIdx = -1;
     let rawHeaders = [];
@@ -355,7 +355,7 @@ export const uploadCsv = async (req, res) => {
       const line = lines[i].trim();
       if (!line) continue;
       
-      // Split by comma
+      
       const parts = line.split(',').map(p => p.trim().replace(/^["']|["']$/g, '').toLowerCase());
       
       const hasName = parts.some(p => nameSyns.some(syn => p.includes(syn)));
@@ -374,7 +374,7 @@ export const uploadCsv = async (req, res) => {
       });
     }
 
-    // Filter only the lines starting from headerIdx up to empty row or a new divider
+    
     const itemsLines = [];
     for (let i = headerIdx; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -388,7 +388,7 @@ export const uploadCsv = async (req, res) => {
     const itemsContent = itemsLines.join('\n');
     const cleanHeaders = rawHeaders.map(h => h.trim().toLowerCase().replace(/ /g, '_').replace(/-/g, '_'));
 
-    // Parse CSV records
+    
     const results = [];
     const stream = Readable.from(itemsContent);
 
@@ -403,7 +403,7 @@ export const uploadCsv = async (req, res) => {
     for (const row of results) {
       rowIdx++;
       
-      // Skip empty row
+      
       if (Object.values(row).every(val => !val || !val.trim())) {
         continue;
       }
@@ -420,7 +420,7 @@ export const uploadCsv = async (req, res) => {
         continue;
       }
 
-      // Check DB duplicates
+      
       const nameExists = await Item.findOne({ name });
       if (nameExists) {
         errors.push(`Row ${rowIdx} ('${name}'): Product name already exists in the market.`);
@@ -473,7 +473,7 @@ export const uploadCsv = async (req, res) => {
       message: `Successfully imported ${successItems.length} items!`,
       successCount: successItems.length,
       errorsCount: errors.length,
-      errors: errors.slice(0, 5) // Show top 5 errors just like Flask
+      errors: errors.slice(0, 5) 
     };
 
     res.status(200).json(response);
@@ -483,7 +483,7 @@ export const uploadCsv = async (req, res) => {
   }
 };
 
-// CSV Template Download
+
 export const getCsvTemplate = (req, res) => {
   const rows = [
     ['Name', 'Barcode', 'Price', 'Stock', 'Category', 'Description', 'Image URL'],
