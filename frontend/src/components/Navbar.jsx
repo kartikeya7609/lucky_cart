@@ -17,7 +17,9 @@ import {
   BellDot,
   CheckCheck,
   AlertTriangle,
-  Clover
+  ClipboardList, 
+  Clover,
+  Download
 } from 'lucide-react';
 
 const Navbar = () => {
@@ -29,6 +31,36 @@ const Navbar = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const notifRef = useRef(null);
+
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      // Prevent Chrome 67 and earlier from automatically showing the prompt
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
+    }
+    setDeferredPrompt(null);
+  };
 
   const isActive = (path) => location.pathname === path;
   const totalCartQty = cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -223,6 +255,16 @@ const Navbar = () => {
 
           {/* Right Controls */}
           <div className="flex items-center gap-3">
+            
+            {/* ── PWA Install Button ──────────────────────── */}
+            {isInstallable && (
+              <button 
+                onClick={handleInstallClick}
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/20"
+              >
+                Install App
+              </button>
+            )}
 
             {/* ── Notification Bell ─────────────────────── */}
             {user && user.role !== 'admin' && (
@@ -452,15 +494,28 @@ const Navbar = () => {
         )}
 
         {user && user.role !== 'admin' && (
-          <Link 
-            to="/account"
-            className={`flex-1 flex flex-col items-center justify-center h-full space-y-1 transition-all ${
-              isActive('/account') ? 'text-blue-400' : 'text-gray-500 hover:text-white'
-            }`}
-          >
-            <User size={20} className={isActive('/account') ? 'drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Account</span>
-          </Link>
+          <>
+            <Link 
+              to="/account"
+              className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+                isActive('/account') ? 'text-blue-400' : 'text-gray-500'
+              }`}
+            >
+              <User size={20} className="mb-1" />
+              <span className="text-[9px] font-black uppercase tracking-wider">Account</span>
+            </Link>
+            {isInstallable && (
+              <button 
+                onClick={handleInstallClick}
+                className="flex flex-col items-center p-2 rounded-xl transition-all text-blue-400"
+              >
+                <div className="bg-blue-500/20 p-1.5 rounded-full mb-0.5">
+                  <Download size={14} />
+                </div>
+                <span className="text-[9px] font-black uppercase tracking-wider">Install</span>
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
