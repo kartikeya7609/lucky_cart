@@ -9,7 +9,7 @@ import {
   Star, Activity, Settings, LogOut, Calendar, Download, IndianRupee,
   TrendingUp, TrendingDown, RefreshCw, Search, Eye, Plus, UserPlus,
   CornerUpLeft, Truck, Check, Trash, Edit, X,
-  ChevronLeft, ChevronRight, Table, LayoutGrid, Upload, Trash2
+  ChevronLeft, ChevronRight, Table, LayoutGrid, Upload, Trash2, Menu
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -44,6 +44,7 @@ const AdminDashboard = () => {
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [customerQuery, setCustomerQuery] = useState('');
   const [reviewQuery, setReviewQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const revChartRef = useRef(null);
   const donutChartRef = useRef(null);
@@ -411,18 +412,25 @@ const AdminDashboard = () => {
   return (
     <div className="admin-dashboard">
       <div className="shell">
-        <div className="sidebar">
-          <div className="logo"><ShoppingCart /> LuckyCart</div>
+        {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>}
+        
+        <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+          <div className="logo">
+            <ShoppingCart /> LuckyCart
+            <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
+              <X size={18} />
+            </button>
+          </div>
           <div className="nav-section">Main</div>
           {navItems.map(item => (
-            <div key={item.id} className={`nav-item ${activeTab === item.id ? 'active' : ''}`} onClick={() => setActiveTab(item.id)}>
+            <div key={item.id} className={`nav-item ${activeTab === item.id ? 'active' : ''}`} onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}>
               <item.icon /> {item.label}
               {item.badge ? <span className="nav-badge">{item.badge}</span> : null}
             </div>
           ))}
           <div className="nav-section" style={{ marginTop: 8 }}>System</div>
           {sysItems.map(item => (
-            <div key={item.id} className={`nav-item ${activeTab === item.id ? 'active' : ''}`} onClick={() => setActiveTab(item.id)}>
+            <div key={item.id} className={`nav-item ${activeTab === item.id ? 'active' : ''}`} onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}>
               <item.icon /> {item.label}
               {item.badge ? <span className="nav-badge">{item.badge}</span> : null}
             </div>
@@ -441,6 +449,13 @@ const AdminDashboard = () => {
         </div>
 
         <div className="main">
+          <div className="mobile-header">
+            <button className="menu-toggle-btn" onClick={() => setSidebarOpen(true)}>
+              <Menu size={20} />
+            </button>
+            <div className="mobile-logo"><ShoppingCart size={16} /> LuckyCart</div>
+            <div className="mobile-avatar">AD</div>
+          </div>
           {/* OVERVIEW PAGE */}
           {activeTab === 'overview' && (
             <div className="page active">
@@ -498,39 +513,43 @@ const AdminDashboard = () => {
               <div className="row3">
                 <div className="card">
                   <div className="card-title">Top products <span className="card-title-sub">by revenue</span></div>
-                  <table>
-                    <thead><tr><th>Product</th><th>Units</th><th>Revenue</th></tr></thead>
-                    <tbody>
-                      <tr><td>Sony WH-1000XM5</td><td>142</td><td>₹2,13,000</td></tr>
-                      <tr><td>iPhone 15 Pro Case</td><td>389</td><td>₹58,350</td></tr>
-                      <tr><td>Samsung 65" QLED</td><td>28</td><td>₹50,400</td></tr>
-                      <tr><td>OnePlus Buds 3</td><td>220</td><td>₹43,780</td></tr>
-                      <tr><td>Boat Rockerz 550</td><td>310</td><td>₹37,200</td></tr>
-                    </tbody>
-                  </table>
+                  <div className="table-responsive">
+                    <table>
+                      <thead><tr><th>Product</th><th>Units</th><th>Revenue</th></tr></thead>
+                      <tbody>
+                        <tr><td>Sony WH-1000XM5</td><td>142</td><td>₹2,13,000</td></tr>
+                        <tr><td>iPhone 15 Pro Case</td><td>389</td><td>₹58,350</td></tr>
+                        <tr><td>Samsung 65" QLED</td><td>28</td><td>₹50,400</td></tr>
+                        <tr><td>OnePlus Buds 3</td><td>220</td><td>₹43,780</td></tr>
+                        <tr><td>Boat Rockerz 550</td><td>310</td><td>₹37,200</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
                 <div className="card">
                   <div className="card-title">Recent Real Orders</div>
                   {loading ? <p>Loading...</p> : (
-                    <table>
-                      <thead><tr><th>Customer</th><th>Total</th><th>Date</th></tr></thead>
-                      <tbody>
-                        {orders.slice(0, 5).map(o => (
-                          <tr key={o._id}>
-                            <td>
-                              <div className="user-row">
-                                <div className="user-avatar u-b" style={{ width: 24, height: 24, fontSize: 10 }}>
-                                  {o.user?.username?.[0]?.toUpperCase() || 'U'}
+                    <div className="table-responsive">
+                      <table>
+                        <thead><tr><th>Customer</th><th>Total</th><th>Date</th></tr></thead>
+                        <tbody>
+                          {orders.slice(0, 5).map(o => (
+                            <tr key={o._id}>
+                              <td>
+                                <div className="user-row">
+                                  <div className="user-avatar u-b" style={{ width: 24, height: 24, fontSize: 10 }}>
+                                    {o.user?.username?.[0]?.toUpperCase() || 'U'}
+                                  </div>
+                                  {o.user?.username || 'Guest'}
                                 </div>
-                                {o.user?.username || 'Guest'}
-                              </div>
-                            </td>
-                            <td>₹{o.total_price.toLocaleString()}</td>
-                            <td style={{ fontSize: 10 }}>{new Date(o.date_ordered).toLocaleDateString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                              </td>
+                              <td>₹{o.total_price.toLocaleString()}</td>
+                              <td style={{ fontSize: 10 }}>{new Date(o.date_ordered).toLocaleDateString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
               </div>
@@ -553,32 +572,34 @@ const AdminDashboard = () => {
               <div className="full-card">
                 <div className="search-bar"><Search /><input value={orderQuery} onChange={e => setOrderQuery(e.target.value)} placeholder="Search by order ID, customer…" /></div>
                 {loading ? <p>Loading orders...</p> : (
-                  <table>
-                    <thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
-                    <tbody>
-                      {filteredOrders.map(o => (
-                        <tr key={o._id}>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>#LC-{o._id.slice(-8).toUpperCase()}</td>
-                          <td>
-                            <div className="user-row">
-                              <div className="user-avatar u-c" style={{ width: 24, height: 24, fontSize: 10 }}>
-                                {o.user?.username?.[0]?.toUpperCase() || 'U'}
+                  <div className="table-responsive">
+                    <table>
+                      <thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+                      <tbody>
+                        {filteredOrders.map(o => (
+                          <tr key={o._id}>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>#LC-{o._id.slice(-8).toUpperCase()}</td>
+                            <td>
+                              <div className="user-row">
+                                <div className="user-avatar u-c" style={{ width: 24, height: 24, fontSize: 10 }}>
+                                  {o.user?.username?.[0]?.toUpperCase() || 'U'}
+                                </div>
+                                {o.user?.username || 'Guest'}
                               </div>
-                              {o.user?.username || 'Guest'}
-                            </div>
-                          </td>
-                          <td>₹{o.total_price.toLocaleString()}</td>
-                          <td>
-                            <span className={`badge ${o.status === 'Delivered' ? 'badge-success' : o.status === 'Cancelled' ? 'badge-danger' : 'badge-warning'}`}>
-                              {o.status}
-                            </span>
-                          </td>
-                          <td style={{ fontSize: 11 }}>{new Date(o.date_ordered).toLocaleDateString()}</td>
-                          <td><button className="act-btn"><Eye /> View</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            </td>
+                            <td>₹{o.total_price.toLocaleString()}</td>
+                            <td>
+                              <span className={`badge ${o.status === 'Delivered' ? 'badge-success' : o.status === 'Cancelled' ? 'badge-danger' : 'badge-warning'}`}>
+                                {o.status}
+                              </span>
+                            </td>
+                            <td style={{ fontSize: 11 }}>{new Date(o.date_ordered).toLocaleDateString()}</td>
+                            <td><button className="act-btn"><Eye /> View</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -892,35 +913,37 @@ const AdminDashboard = () => {
               <div className="full-card">
                 <div className="search-bar"><Search /><input value={customerQuery} onChange={e => setCustomerQuery(e.target.value)} placeholder="Search by name, email, username…" /></div>
                 {loading ? <p>Loading users...</p> : (
-                  <table>
-                    <thead><tr><th>Customer</th><th>Email</th><th>Role</th><th>Budget</th><th>Joined</th><th>Status</th></tr></thead>
-                    <tbody>
-                      {filteredCustomers.map(u => (
-                        <tr key={u._id}>
-                          <td>
-                            <div className="user-row">
-                              <div className="user-avatar u-e" style={{ width: 28, height: 28, fontSize: 11 }}>
-                                {u.username?.[0]?.toUpperCase() || 'U'}
+                  <div className="table-responsive">
+                    <table>
+                      <thead><tr><th>Customer</th><th>Email</th><th>Role</th><th>Budget</th><th>Joined</th><th>Status</th></tr></thead>
+                      <tbody>
+                        {filteredCustomers.map(u => (
+                          <tr key={u._id}>
+                            <td>
+                              <div className="user-row">
+                                <div className="user-avatar u-e" style={{ width: 28, height: 28, fontSize: 11 }}>
+                                  {u.username?.[0]?.toUpperCase() || 'U'}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 12, fontWeight: 500 }}>{u.full_name || u.username}</div>
+                                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{u.username}</div>
+                                </div>
                               </div>
-                              <div>
-                                <div style={{ fontSize: 12, fontWeight: 500 }}>{u.full_name || u.username}</div>
-                                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{u.username}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ fontSize: 11 }}>{u.email_address}</td>
-                          <td>
-                            <span className={`badge ${u.role === 'seller' ? 'badge-warning' : 'badge-info'}`}>
-                              {u.role === 'seller' ? 'Seller' : 'Buyer'}
-                            </span>
-                          </td>
-                          <td>₹{u.budget?.toLocaleString()}</td>
-                          <td style={{ fontSize: 11 }}>{new Date(u.createdAt).toLocaleDateString()}</td>
-                          <td><span className="badge badge-success">Active</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            </td>
+                            <td style={{ fontSize: 11 }}>{u.email_address}</td>
+                            <td>
+                              <span className={`badge ${u.role === 'seller' ? 'badge-warning' : 'badge-info'}`}>
+                                {u.role === 'seller' ? 'Seller' : 'Buyer'}
+                              </span>
+                            </td>
+                            <td>₹{u.budget?.toLocaleString()}</td>
+                            <td style={{ fontSize: 11 }}>{new Date(u.createdAt).toLocaleDateString()}</td>
+                            <td><span className="badge badge-success">Active</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -980,51 +1003,53 @@ const AdminDashboard = () => {
               <div className="full-card">
                 <div className="search-bar"><Search /><input value={reviewQuery} onChange={e => setReviewQuery(e.target.value)} placeholder="Search by customer, product, comment…" /></div>
                 {loading ? <p>Loading reviews...</p> : (
-                  <table>
-                    <thead><tr><th>Customer</th><th>Product</th><th>Rating</th><th>Review</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
-                    <tbody>
-                      {filteredReviews.map(r => (
-                        <tr key={r._id}>
-                          <td>
-                            <div className="user-row">
-                              <div className="user-avatar u-b" style={{ width: 24, height: 24, fontSize: 10 }}>
-                                {r.user?.username?.[0]?.toUpperCase() || 'U'}
+                  <div className="table-responsive">
+                    <table>
+                      <thead><tr><th>Customer</th><th>Product</th><th>Rating</th><th>Review</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+                      <tbody>
+                        {filteredReviews.map(r => (
+                          <tr key={r._id}>
+                            <td>
+                              <div className="user-row">
+                                <div className="user-avatar u-b" style={{ width: 24, height: 24, fontSize: 10 }}>
+                                  {r.user?.username?.[0]?.toUpperCase() || 'U'}
+                                </div>
+                                {r.user?.username || 'Guest'}
                               </div>
-                              {r.user?.username || 'Guest'}
-                            </div>
-                          </td>
-                          <td style={{ fontSize: 11, maxWidth: 120 }}>{r.item?.name || 'Item'}</td>
-                          <td>
-                            <span style={{ color: 'var(--color-text-warning)' }}>
-                              {'★'.repeat(r.rating)}
-                            </span>
-                            <span style={{ color: 'var(--color-text-tertiary)' }}>
-                              {'★'.repeat(5 - r.rating)}
-                            </span>
-                          </td>
-                          <td style={{ fontSize: 11, maxWidth: 160, color: 'var(--color-text-secondary)' }}>{r.comment}</td>
-                          <td style={{ fontSize: 11 }}>{new Date(r.createdAt || r.date_posted).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`badge ${r.is_verified ? 'badge-success' : 'badge-warning'}`}>
-                              {r.is_verified ? 'Approved' : 'Pending'}
-                            </span>
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              {!r.is_verified && (
-                                <button className="act-btn" onClick={() => handleApproveReview(r._id)}>
-                                  <Check size={12} /> Approve
+                            </td>
+                            <td style={{ fontSize: 11, maxWidth: 120 }}>{r.item?.name || 'Item'}</td>
+                            <td>
+                              <span style={{ color: 'var(--color-text-warning)' }}>
+                                {'★'.repeat(r.rating)}
+                              </span>
+                              <span style={{ color: 'var(--color-text-tertiary)' }}>
+                                {'★'.repeat(5 - r.rating)}
+                              </span>
+                            </td>
+                            <td style={{ fontSize: 11, maxWidth: 160, color: 'var(--color-text-secondary)' }}>{r.comment}</td>
+                            <td style={{ fontSize: 11 }}>{new Date(r.createdAt || r.date_posted).toLocaleDateString()}</td>
+                            <td>
+                              <span className={`badge ${r.is_verified ? 'badge-success' : 'badge-warning'}`}>
+                                {r.is_verified ? 'Approved' : 'Pending'}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                {!r.is_verified && (
+                                  <button className="act-btn" onClick={() => handleApproveReview(r._id)}>
+                                    <Check size={12} /> Approve
+                                  </button>
+                                )}
+                                <button className="act-btn" style={{ color: 'var(--color-text-danger)' }} onClick={() => handleDeleteReview(r._id)}>
+                                  <Trash size={12} /> Delete
                                 </button>
-                              )}
-                              <button className="act-btn" style={{ color: 'var(--color-text-danger)' }} onClick={() => handleDeleteReview(r._id)}>
-                                <Trash size={12} /> Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
