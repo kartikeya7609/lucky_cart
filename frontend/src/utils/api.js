@@ -1,5 +1,5 @@
 // Centralized fetch wrapper for backend API calls
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const handleResponse = async (res) => {
   const isJson = res.headers.get('content-type')?.includes('application/json');
