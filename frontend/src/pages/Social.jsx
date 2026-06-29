@@ -1529,6 +1529,59 @@ const Social = () => {
         .no-conv svg { opacity: 0.3; }
         .no-conv p { font-size: 13px; }
 
+        /* Mobile tab switcher styles */
+        .mobile-tabs-nav {
+          display: none;
+          position: sticky;
+          top: 80px; /* underneath the sticky navbar */
+          z-index: 40;
+          background: rgba(13,13,13,0.85);
+          backdrop-filter: blur(12px);
+          border-bottom: 0.5px solid var(--color-border-tertiary);
+          padding: 4px;
+          gap: 4px;
+          margin-bottom: 12px;
+        }
+
+        .mobile-tab-btn {
+          flex: 1;
+          background: none;
+          border: none;
+          color: var(--color-text-secondary);
+          font-family: var(--font-sans);
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          padding: 10px 0;
+          border-radius: var(--border-radius-md);
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mobile-tab-btn.active {
+          background: rgba(26,173,82,0.12);
+          color: #1aad52;
+          box-shadow: inset 0 0 0 1px rgba(26,173,82,0.25);
+        }
+
+        @media (max-width: 1024px) {
+          .mobile-tabs-nav {
+            display: flex;
+          }
+          .main {
+            grid-template-columns: 1fr;
+            padding: 8px;
+            gap: 12px;
+          }
+          .col {
+            display: none !important;
+          }
+          .col.active-mobile {
+            display: flex !important;
+          }
+        }
+
         /* ── Mobile responsive ── */
         .chat-fs-mobile-back { display: none; }
 
@@ -1800,7 +1853,17 @@ const Social = () => {
           {/* Left Sidebar */}
           <div className="chat-fs-sidebar">
             <div className="chat-fs-sidebar-header">
-              <h2>Messages</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button 
+                  onClick={() => setActiveChat(null)}
+                  className="chat-fs-icon-btn"
+                  title="Back to feed"
+                  aria-label="Back to feed"
+                >
+                  <ArrowLeft size={16} />
+                </button>
+                <h2>Messages</h2>
+              </div>
               <button className="chat-fs-icon-btn" style={{ border: '0.5px solid var(--border2)', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Plus size={12} />
               </button>
