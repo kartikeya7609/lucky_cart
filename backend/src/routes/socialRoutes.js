@@ -12,6 +12,7 @@ import {
   getRecommendations,
   togglePrivacy,
   createGroup,
+  deleteGroup,
   joinGroup,
   leaveGroup,
   getGroupDetails,
@@ -49,6 +50,7 @@ router.post('/groups', protect, createGroup);
 router.get('/groups/joined', protect, getJoinedGroups);
 router.post('/groups/:groupId/join', protect, joinGroup);
 router.post('/groups/:groupId/leave', protect, leaveGroup);
+router.delete('/groups/:groupId', protect, deleteGroup);
 router.get('/groups/:groupId', protect, getGroupDetails);
 router.post('/groups/:groupId/share-product', protect, shareProductToGroup);
 

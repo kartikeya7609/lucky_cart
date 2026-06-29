@@ -393,19 +393,52 @@ export const togglePrivacy = async (req, res) => {
 export const createGroup = async (req, res) => {
   try {
     const { name, description } = req.body;
-    if (!name) {
+    const cleanName = name?.trim();
+    if (!cleanName) {
       return res.status(400).json({ message: 'Group name is required.' });
     }
 
     const { Group } = await import('../models/index.js');
+    const escapedName = cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const existingGroup = await Group.findOne({
+      creator: req.user._id,
+      name: { $regex: `^${escapedName}$`, $options: 'i' }
+    });
+
+    if (existingGroup) {
+      return res.status(409).json({ message: 'You already created a group with this name.' });
+    }
+
     const group = await Group.create({
-      name,
-      description,
+      name: cleanName,
+      description: description?.trim() || '',
       creator: req.user._id,
       members: [req.user._id]
     });
 
     res.status(201).json({ message: 'Group created successfully.', group });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Delete a shopping group. Only the creator can delete it.
+export const deleteGroup = async (req, res) => {
+  try {
+    const { Group, Message } = await import('../models/index.js');
+    const group = await Group.findById(req.params.groupId);
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found.' });
+    }
+
+    if (group.creator.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the group creator can delete this group.' });
+    }
+
+    await Message.deleteMany({ group: group._id });
+    await Group.findByIdAndDelete(group._id);
+
+    res.status(200).json({ message: 'Group deleted successfully.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -420,7 +453,7 @@ export const joinGroup = async (req, res) => {
       return res.status(404).json({ message: 'Group not found.' });
     }
 
-    if (group.members.includes(req.user._id)) {
+    if (group.members.some(id => id.toString() === req.user._id.toString())) {
       return res.status(400).json({ message: 'You are already a member of this group.' });
     }
 
@@ -510,7 +543,7 @@ export const shareProductToGroup = async (req, res) => {
       return res.status(404).json({ message: 'Group not found.' });
     }
 
-    if (!group.members.includes(req.user._id)) {
+    if (!group.members.some(id => id.toString() === req.user._id.toString())) {
       return res.status(403).json({ message: 'Access denied. You are not a member of this group.' });
     }
 
@@ -581,22 +614,32 @@ export const getChatMessages = async (req, res) => {
       { $set: { is_read: true } }
     );
 
-    const messages = await Message.find({
+    const limit = parseInt(req.query.limit) || 50;
+    const before = req.query.before;
+
+    const query = {
       $or: [
         { sender: currentUserId, recipient: targetUserId },
         { sender: targetUserId, recipient: currentUserId }
       ]
-    })
-    .populate('sender', 'username full_name profile_pic')
-    .populate('recipient', 'username full_name profile_pic')
-    .populate('metadata.productId', 'name price user_file description')
-    .populate('metadata.cartItems.product', 'name price user_file description')
-    .populate({
-      path: 'replyTo',
-      populate: { path: 'sender', select: 'username full_name' }
-    })
-    .sort({ createdAt: 1 });
+    };
+    if (before) {
+      query.createdAt = { $lt: new Date(before) };
+    }
 
+    const messages = await Message.find(query)
+      .populate('sender', 'username full_name profile_pic')
+      .populate('recipient', 'username full_name profile_pic')
+      .populate('metadata.productId', 'name price user_file description')
+      .populate('metadata.cartItems.product', 'name price user_file description')
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'sender', select: 'username full_name' }
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    messages.reverse();
     res.status(200).json(messages);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -611,11 +654,19 @@ export const getGroupChatMessages = async (req, res) => {
 
     // Verify membership first
     const group = await Group.findById(groupId);
-    if (!group || !group.members.includes(req.user._id)) {
+    if (!group || !group.members.some(id => id.toString() === req.user._id.toString())) {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
-    const messages = await Message.find({ group: groupId })
+    const limit = parseInt(req.query.limit) || 50;
+    const before = req.query.before;
+
+    const query = { group: groupId };
+    if (before) {
+      query.createdAt = { $lt: new Date(before) };
+    }
+
+    const messages = await Message.find(query)
       .populate('sender', 'username full_name profile_pic')
       .populate('metadata.productId', 'name price user_file description')
       .populate('metadata.cartItems.product', 'name price user_file description')
@@ -623,8 +674,10 @@ export const getGroupChatMessages = async (req, res) => {
         path: 'replyTo',
         populate: { path: 'sender', select: 'username full_name' }
       })
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: -1 })
+      .limit(limit);
 
+    messages.reverse();
     res.status(200).json(messages);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -637,34 +690,83 @@ export const getChatConversations = async (req, res) => {
     const currentUserId = req.user._id;
     const { Message } = await import('../models/index.js');
 
-    // Find all DMs involving current user
-    const messages = await Message.find({
-      $or: [{ sender: currentUserId }, { recipient: currentUserId }],
-      group: null
-    })
-    .populate('sender', 'username full_name profile_pic')
-    .populate('recipient', 'username full_name profile_pic')
-    .sort({ createdAt: -1 });
+    const conversations = await Message.aggregate([
+      {
+        $match: {
+          group: null,
+          $or: [
+            { sender: currentUserId },
+            { recipient: currentUserId }
+          ]
+        }
+      },
+      {
+        $project: {
+          sender: 1,
+          recipient: 1,
+          content: 1,
+          createdAt: 1,
+          is_read: 1,
+          message_type: 1,
+          replyTo: 1,
+          metadata: 1,
+          reactions: 1,
+          senderStr: { $toString: "$sender" },
+          recipientStr: { $toString: "$recipient" },
+          currentUserStr: { $literal: currentUserId.toString() }
+        }
+      },
+      {
+        $sort: { createdAt: -1 }
+      },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ["$senderStr", "$currentUserStr"] },
+              "$recipient",
+              "$sender"
+            ]
+          },
+          lastMessage: { $first: "$$ROOT" }
+        }
+      }
+    ]);
 
-    // Group by participant
-    const conversationMap = new Map();
-    messages.forEach(msg => {
-      const otherUser = msg.sender._id.toString() === currentUserId.toString() ? msg.recipient : msg.sender;
-      if (!otherUser) return;
-      const otherUserId = otherUser._id.toString();
+    const userIds = conversations.map(c => c._id).filter(Boolean);
+    const users = await User.find({ _id: { $in: userIds } })
+      .select('username full_name profile_pic createdAt')
+      .lean();
+    const usersById = new Map(users.map(u => [u._id.toString(), u]));
 
-      if (!conversationMap.has(otherUserId)) {
-        conversationMap.set(otherUserId, {
+    const populatedMessages = await Message.populate(
+      conversations.map(c => c.lastMessage),
+      [
+        { path: 'sender', model: 'User', select: 'username full_name profile_pic' },
+        { path: 'recipient', model: 'User', select: 'username full_name profile_pic' },
+        { path: 'metadata.productId', model: 'Item', select: 'name price user_file description' },
+        { path: 'metadata.cartItems.product', model: 'Item', select: 'name price user_file description' }
+      ]
+    );
+
+    const result = conversations
+      .map(c => {
+        const otherUser = usersById.get(c._id?.toString());
+        if (!otherUser) return null;
+        const msg = populatedMessages.find(m => String(m._id) === String(c.lastMessage?._id)) || c.lastMessage;
+        return {
           user: otherUser,
           lastMessage: msg
-        });
-      }
-    });
+        };
+      })
+      .filter(Boolean);
 
-    res.status(200).json(Array.from(conversationMap.values()));
+    // Sort by latest message date descending
+    result.sort((a, b) => new Date(b.lastMessage.createdAt) - new Date(a.lastMessage.createdAt));
+
+    res.status(200).json(result);
   } catch (err) {
+    console.error('Error fetching chat conversations:', err);
     res.status(500).json({ message: err.message });
   }
 };
-
-

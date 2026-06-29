@@ -31,7 +31,7 @@ const Wishlist = () => {
 
   const togglePrivacy = async () => {
     try {
-      const res = await api.put('/wishlist/privacy', {}, token);
+      const res = await api.post('/wishlist/toggle-privacy', {}, token);
       addToast(res.message, 'success');
       await fetchWishlist();
     } catch (err) {
@@ -41,7 +41,7 @@ const Wishlist = () => {
 
   const handleRemove = async (wishlistItemId) => {
     try {
-      const res = await api.delete(`/wishlist/remove/${wishlistItemId}`, token);
+      const res = await api.delete(`/wishlist/${wishlistItemId}`, token);
       addToast(res.message, 'success');
       await fetchWishlist();
     } catch (err) {

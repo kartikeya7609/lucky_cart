@@ -186,10 +186,15 @@ export const respondCancellation = async (req, res) => {
         }
       }
 
+      // Proportional refund calculation
+      const orderSubtotal = order.items.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const sellerSubtotal = sellerItems.reduce((sum, { oi }) => sum + oi.price * oi.quantity, 0);
+      const refundAmount = orderSubtotal > 0 ? sellerSubtotal * (order.total_price / orderSubtotal) : 0;
+
       // ── Refund buyer immediately ──
       const buyer = await User.findById(order.user);
       if (buyer) {
-        buyer.budget += order.total_price;
+        buyer.budget += refundAmount;
         await buyer.save();
       }
 
@@ -199,11 +204,11 @@ export const respondCancellation = async (req, res) => {
       // Notify buyer
       const notif = new Notification({
         user: order.user,
-        message: `✅ Your cancellation for Order #LC-${String(order._id).slice(-6)} was approved! ₹${order.total_price.toFixed(2)} has been refunded to your account.`
+        message: `✅ Your cancellation for Order #LC-${String(order._id).slice(-6)} was approved! ₹${refundAmount.toFixed(2)} has been refunded to your account.`
       });
       await notif.save();
 
-      res.status(200).json({ message: `Cancellation accepted. Buyer refunded ₹${order.total_price.toFixed(2)}.`, order });
+      res.status(200).json({ message: `Cancellation accepted. Buyer refunded ₹${refundAmount.toFixed(2)}.`, order });
 
     } else {
       // ── Reject: restore order to 'Ordered' status ──
@@ -241,34 +246,50 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
+    // Verify this seller owns at least one item in the order
+    const sellerItems = [];
+    for (const oi of order.items) {
+      const itemObj = await Item.findById(oi.item);
+      if (itemObj && String(itemObj.seller) === String(sellerId)) {
+        sellerItems.push({ oi, itemObj });
+      }
+    }
+    if (sellerItems.length === 0) {
+      return res.status(403).json({ message: 'You are not the seller for any item in this order.' });
+    }
+
     // Handle Reject refund logic
     if (status === 'Rejected' && order.status !== 'Rejected') {
       // For each item in the order, check if sold by this seller
-      for (const oi of order.items) {
-        const itemObj = await Item.findById(oi.item);
-        if (itemObj && String(itemObj.seller) === String(sellerId)) {
-          // Refund stock
-          itemObj.stock += oi.quantity;
-          await itemObj.save();
+      for (const { oi, itemObj } of sellerItems) {
+        // Refund stock
+        itemObj.stock += oi.quantity;
+        await itemObj.save();
 
-          // Deduct seller budget
-          const seller = await User.findById(sellerId);
+        // Deduct seller budget
+        const seller = await User.findById(sellerId);
+        if (seller) {
           seller.budget -= oi.price * oi.quantity;
           await seller.save();
         }
       }
 
+      // Proportional refund calculation
+      const orderSubtotal = order.items.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const sellerSubtotal = sellerItems.reduce((sum, { oi }) => sum + oi.price * oi.quantity, 0);
+      const refundAmount = orderSubtotal > 0 ? sellerSubtotal * (order.total_price / orderSubtotal) : 0;
+
       // Refund buyer total order price
       const buyer = await User.findById(order.user);
       if (buyer) {
-        buyer.budget += order.total_price;
+        buyer.budget += refundAmount;
         await buyer.save();
       }
 
       // Notify Buyer
       const notif = new Notification({
         user: order.user,
-        message: `Order #LC-${String(order._id).slice(-6)} rejected. Refunded.`
+        message: `Order #LC-${String(order._id).slice(-6)} rejected. Refunded ₹${refundAmount.toFixed(2)}.`
       });
       await notif.save();
     } else if (status !== order.status) {
@@ -384,10 +405,15 @@ export const respondReturn = async (req, res) => {
         }
       }
 
+      // Proportional refund calculation
+      const orderSubtotal = order.items.reduce((sum, oi) => sum + oi.price * oi.quantity, 0);
+      const sellerSubtotal = sellerItems.reduce((sum, { oi }) => sum + oi.price * oi.quantity, 0);
+      const refundAmount = orderSubtotal > 0 ? sellerSubtotal * (order.total_price / orderSubtotal) : 0;
+
       // Refund buyer
       const buyer = await User.findById(order.user);
       if (buyer) {
-        buyer.budget += order.total_price;
+        buyer.budget += refundAmount;
         await buyer.save();
       }
 
@@ -396,10 +422,10 @@ export const respondReturn = async (req, res) => {
 
       await new Notification({
         user: order.user,
-        message: `✅ Your return for Order #LC-${String(order._id).slice(-6)} was approved! ₹${order.total_price.toFixed(2)} has been refunded to your account.`
+        message: `✅ Your return for Order #LC-${String(order._id).slice(-6)} was approved! ₹${refundAmount.toFixed(2)} has been refunded to your account.`
       }).save();
 
-      res.status(200).json({ message: `Return accepted. Buyer refunded ₹${order.total_price.toFixed(2)}.`, order });
+      res.status(200).json({ message: `Return accepted. Buyer refunded ₹${refundAmount.toFixed(2)}.`, order });
 
     } else {
       // Reject: restore to Delivered

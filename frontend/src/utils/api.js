@@ -59,6 +59,17 @@ const customFetch = async (url, options, tokenParam = null) => {
     if (!refreshToken) {
       return handleResponse(res);
     }
+
+    const retryPromise = new Promise((resolve) => {
+      subscribeTokenRefresh((newToken) => {
+        if (newToken) {
+          headers['Authorization'] = `Bearer ${newToken}`;
+          resolve(fetch(url, { ...options, headers }).then(handleResponse));
+        } else {
+          resolve(handleResponse(res));
+        }
+      });
+    });
     
     if (!isRefreshing) {
       isRefreshing = true;
@@ -88,25 +99,15 @@ const customFetch = async (url, options, tokenParam = null) => {
           if (tokenUpdateListener) {
             tokenUpdateListener(null);
           }
-          return handleResponse(res);
+          onRefreshed(null);
         }
       } catch (err) {
         isRefreshing = false;
-        return handleResponse(res);
+        onRefreshed(null);
       }
     }
     
-    // Wait for the new token and retry the request
-    return new Promise((resolve) => {
-      subscribeTokenRefresh((newToken) => {
-        if (newToken) {
-          headers['Authorization'] = `Bearer ${newToken}`;
-          resolve(fetch(url, { ...options, headers }).then(handleResponse));
-        } else {
-          resolve(handleResponse(res));
-        }
-      });
-    });
+    return retryPromise;
   }
   
   return handleResponse(res);

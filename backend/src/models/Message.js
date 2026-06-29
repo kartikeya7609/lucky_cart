@@ -67,6 +67,8 @@ const messageSchema = new mongoose.Schema({
 
 // Indexes to optimize inbox loading and chat scrolls
 messageSchema.index({ sender: 1, recipient: 1, createdAt: -1 });
+messageSchema.index({ sender: 1, createdAt: -1 });
+messageSchema.index({ recipient: 1, createdAt: -1 });
 messageSchema.index({ group: 1, createdAt: -1 });
 
 const Message = mongoose.model('Message', messageSchema);

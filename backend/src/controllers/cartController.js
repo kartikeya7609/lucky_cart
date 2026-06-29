@@ -1,4 +1,5 @@
-import { CartItem, Item, User, Order, OrderItem, Coupon, Wishlist, WishlistItem, Notification } from '../models/index.js';
+import mongoose from 'mongoose';
+import { CartItem, Item, User, Order, OrderItem, Coupon, Wishlist, WishlistItem, Notification, Address } from '../models/index.js';
 
 // Retrieve cart items and perform stock/expiry validation
 export const getCart = async (req, res) => {
@@ -208,18 +209,35 @@ export const checkout = async (req, res) => {
   const userId = req.user.id;
   const { couponCode, addressId } = req.body;
 
+  // Verify address ownership first
+  if (addressId) {
+    try {
+      const address = await Address.findOne({ _id: addressId, user: userId });
+      if (!address) {
+        return res.status(400).json({ message: 'Invalid or unauthorized address ID.' });
+      }
+    } catch (err) {
+      return res.status(400).json({ message: 'Invalid address ID format.' });
+    }
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const cartItems = await CartItem.find({ user: userId }).populate('item');
+    const cartItems = await CartItem.find({ user: userId }).populate('item').session(session);
     if (cartItems.length === 0) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ message: 'Cart is empty!' });
     }
 
-    // 1. Calculate and validate total price
+    // 1. Calculate total price
     const subtotal = cartItems.reduce((sum, c) => sum + (c.item.price * c.quantity), 0);
     let discount = 0;
 
     if (couponCode) {
-      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), is_active: true });
+      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), is_active: true }).session(session);
       if (coupon) {
         discount = (subtotal * coupon.discount_percent) / 100;
       }
@@ -227,36 +245,37 @@ export const checkout = async (req, res) => {
 
     const total = subtotal - discount;
 
-    const buyer = await User.findById(userId);
-    if (!buyer.canPurchase(total)) {
-      return res.status(400).json({ message: 'Insufficient funds.' });
+    const buyer = await User.findById(userId).session(session);
+    if (!buyer || !buyer.canPurchase(total)) {
+      throw new Error('Insufficient funds.');
     }
 
-    // 2. Validate stock for all items
+    // 2. Validate stock and deduct atomically inside the transaction loop, and adjust seller budgets
     for (const c of cartItems) {
-      if (c.item.stock < c.quantity) {
-        return res.status(400).json({ message: `Not enough stock for ${c.item.name}.` });
+      if (!c.item) {
+        throw new Error('Item not found in cart.');
       }
-    }
+      const updatedItem = await Item.findOneAndUpdate(
+        { _id: c.item._id, stock: { $gte: c.quantity } },
+        { $inc: { stock: -c.quantity } },
+        { new: true, session }
+      );
+      if (!updatedItem) {
+        throw new Error(`Not enough stock for ${c.item.name}.`);
+      }
 
-    // 3. Deduct stock and adjust budgets
-    for (const c of cartItems) {
-      const itemObj = await Item.findById(c.item._id);
-      itemObj.stock -= c.quantity;
-      await itemObj.save();
-
-      if (itemObj.seller) {
-        const sellerObj = await User.findById(itemObj.seller);
+      if (updatedItem.seller) {
+        const sellerObj = await User.findById(updatedItem.seller).session(session);
         if (sellerObj) {
-          sellerObj.budget += itemObj.price * c.quantity;
-          await sellerObj.save();
+          sellerObj.budget += updatedItem.price * c.quantity;
+          await sellerObj.save({ session });
         }
       }
     }
 
     // Deduct buyer budget
     buyer.budget -= total;
-    await buyer.save();
+    await buyer.save({ session });
 
     // 4. Create Order and OrderItems
     const order = new Order({
@@ -264,7 +283,7 @@ export const checkout = async (req, res) => {
       total_price: total,
       address: addressId || null
     });
-    await order.save();
+    await order.save({ session });
 
     for (const c of cartItems) {
       const orderItem = new OrderItem({
@@ -273,23 +292,26 @@ export const checkout = async (req, res) => {
         quantity: c.quantity,
         price: c.item.price
       });
-      await orderItem.save();
+      await orderItem.save({ session });
     }
 
     // 5. Clear Cart
-    await CartItem.deleteMany({ user: userId });
+    await CartItem.deleteMany({ user: userId }).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
 
     // 6. Notify Sellers (group notification by unique seller id)
     const notifiedSellers = new Set();
     for (const c of cartItems) {
-      if (c.item.seller) {
+      if (c.item && c.item.seller) {
         const sellerIdStr = String(c.item.seller);
         if (!notifiedSellers.has(sellerIdStr)) {
           const notif = new Notification({
             user: c.item.seller,
             message: `New Order #LC-${String(order._id).slice(-6)} received!`
           });
-          await notif.save();
+          await notif.save().catch(err => console.error("Notification save failed", err));
           notifiedSellers.add(sellerIdStr);
         }
       }
@@ -300,7 +322,9 @@ export const checkout = async (req, res) => {
       orderId: order._id
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error(error);
-    res.status(500).json({ message: 'Server error during checkout', error: error.message });
+    res.status(400).json({ message: error.message || 'Server error during checkout' });
   }
 };

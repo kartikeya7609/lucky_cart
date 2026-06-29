@@ -1,6 +1,6 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import { User, Message, Group } from '../models/index.js';
+import { User, Message, Group, Notification } from '../models/index.js';
 
 const onlineUsers = new Map(); // userId -> socketId
 
@@ -61,6 +61,13 @@ export const setupSocket = (server, allowedOrigins) => {
       console.error('Error joining group rooms:', err.message);
     }
 
+    // Join Group Room
+    socket.on('join_group', (data) => {
+      const { groupId } = data;
+      if (!groupId) return;
+      socket.join(`group_${groupId}`);
+    });
+
     // Direct Message Handler
     socket.on('send_dm', async (data) => {
       try {
@@ -98,6 +105,14 @@ export const setupSocket = (server, allowedOrigins) => {
 
         // Emit to recipient and sender (all active tabs)
         io.to(recipientId).to(userId).emit('receive_dm', populatedMessage);
+
+        if (!isRead) {
+          const senderName = socket.user.full_name || socket.user.username;
+          await new Notification({
+            user: recipientId,
+            message: `💬 New message from ${senderName}: "${content.length > 50 ? content.slice(0, 50) + '...' : content}"`
+          }).save().catch(err => console.error("Error saving DM Notification:", err));
+        }
       } catch (err) {
         socket.emit('error_message', { message: err.message });
       }
@@ -120,6 +135,7 @@ export const setupSocket = (server, allowedOrigins) => {
 
         const populatedMessage = await Message.findById(message._id)
           .populate('sender', 'username full_name profile_pic')
+          .populate('group', 'name')
           .populate('metadata.productId', 'name price user_file description')
           .populate({
             path: 'replyTo',
@@ -128,6 +144,31 @@ export const setupSocket = (server, allowedOrigins) => {
 
         // Emit to group room
         io.to(`group_${groupId}`).emit('receive_group_msg', { groupId, message: populatedMessage });
+
+        // Save DB notifications for inactive members
+        const groupObj = await Group.findById(groupId);
+        if (groupObj) {
+          const senderName = socket.user.full_name || socket.user.username;
+          for (const memberId of groupObj.members) {
+            if (memberId.toString() === userId) continue;
+
+            let memberHasGroupActive = false;
+            const memberSocketId = onlineUsers.get(memberId.toString());
+            if (memberSocketId) {
+              const memberSocket = io.sockets.sockets.get(memberSocketId);
+              if (memberSocket && memberSocket.activeChatId === groupId) {
+                memberHasGroupActive = true;
+              }
+            }
+
+            if (!memberHasGroupActive) {
+              await new Notification({
+                user: memberId,
+                message: `👥 New message in group "${groupObj.name}" from ${senderName}: "${content.length > 50 ? content.slice(0, 50) + '...' : content}"`
+              }).save().catch(err => console.error("Error creating Group Notification:", err));
+            }
+          }
+        }
       } catch (err) {
         socket.emit('error_message', { message: err.message });
       }

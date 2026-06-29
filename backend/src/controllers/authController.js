@@ -124,8 +124,10 @@ export const loginUser = async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // 1. Check Admin credentials first (admin1234 / admin)
-    if (username === 'admin1234' && password === 'admin') {
+    // 1. Check Admin credentials first (using env var credentials)
+    const envUsername = process.env.ADMIN_USERNAME || 'admin1234';
+    const envPassword = process.env.ADMIN_PASSWORD || 'admin';
+    if (username === envUsername && password === envPassword) {
       const adminToken = jwt.sign(
         { id: 'admin', role: 'admin' },
         process.env.JWT_SECRET || 'ec9439cfc6c796ae2029594d_jwt',
@@ -142,7 +144,7 @@ export const loginUser = async (req, res) => {
         isAdmin: true,
         accessToken: adminToken,
         user: {
-          username: 'admin1234',
+          username: envUsername,
           role: 'admin'
         }
       });

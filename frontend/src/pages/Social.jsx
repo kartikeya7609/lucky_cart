@@ -21,6 +21,7 @@ const Social = () => {
   // Socket reference
   const socketRef = useRef(null);
   const activeChatRef = useRef(null);
+  const currentUserDataRef = useRef(null);
 
   // UI Panels state
   const [activeTab, setActiveTab] = useState('feed'); // 'feed', 'wishlists', 'carts'
@@ -61,6 +62,7 @@ const Social = () => {
   // Form states
   const [chatInput, setChatInput] = useState('');
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
   const [recentChatsList, setRecentChatsList] = useState([]);
@@ -75,10 +77,36 @@ const Social = () => {
 
   const chatEndRef = useRef(null);
 
-  // Keep activeChatRef in sync
+  const upsertConversation = (conversation) => {
+    setConversations(prev => {
+      const exists = prev.some(c => c.type === conversation.type && c.id === conversation.id);
+      const next = exists
+        ? prev.map(c => (c.type === conversation.type && c.id === conversation.id ? { ...c, ...conversation } : c))
+        : [conversation, ...prev];
+
+      return next.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+    });
+  };
+
+  // Keep activeChatRef and currentUserDataRef in sync
   useEffect(() => {
     activeChatRef.current = activeChat;
   }, [activeChat]);
+
+  useEffect(() => {
+    currentUserDataRef.current = currentUserData;
+  }, [currentUserData]);
+
+  // Auto-join all socket rooms for joined groups when conversations list is updated
+  useEffect(() => {
+    if (socketRef.current && conversations.length > 0) {
+      conversations.forEach(c => {
+        if (c.type === 'group') {
+          socketRef.current.emit('join_group', { groupId: c.id });
+        }
+      });
+    }
+  }, [conversations]);
 
   // Initialize Socket connection ONCE (depends only on token)
   useEffect(() => {
@@ -100,6 +128,13 @@ const Social = () => {
       if (chat && chat.type === 'dm' && 
           (msg.sender._id === chat.id || msg.recipient?._id === chat.id)) {
         setChatMessages(prev => [...prev, msg]);
+      } else {
+        const senderId = msg.sender?._id || msg.sender;
+        const currentUserId = currentUserDataRef.current?.id || currentUserDataRef.current?._id;
+        if (senderId && currentUserId && senderId.toString() !== currentUserId.toString()) {
+          const senderName = msg.sender?.full_name || msg.sender?.username || 'Someone';
+          addToast(`💬 New message from ${senderName}: "${msg.content}"`, 'info');
+        }
       }
       fetchRecentConversations();
     });
@@ -108,6 +143,14 @@ const Social = () => {
       const chat = activeChatRef.current;
       if (chat && chat.type === 'group' && data.groupId === chat.id) {
         setChatMessages(prev => [...prev, data.message]);
+      } else {
+        const senderId = data.message.sender?._id || data.message.sender;
+        const currentUserId = currentUserDataRef.current?.id || currentUserDataRef.current?._id;
+        if (senderId && currentUserId && senderId.toString() !== currentUserId.toString()) {
+          const senderName = data.message.sender?.full_name || data.message.sender?.username || 'Someone';
+          const groupName = data.message.group?.name || 'a group';
+          addToast(`👥 New message in "${groupName}" from ${senderName}: "${data.message.content}"`, 'info');
+        }
       }
       fetchRecentConversations();
     });
@@ -151,6 +194,10 @@ const Social = () => {
       }
     });
 
+    socket.on('error_message', (data) => {
+      addToast(data.message || 'Failed to send message', 'danger');
+    });
+
     // Load initial data
     loadAllSocialData();
 
@@ -189,61 +236,63 @@ const Social = () => {
   // Load backend data helper
   const loadAllSocialData = async () => {
     try {
-      // Current user
-      const me = await api.get('/auth/me', token);
-      setCurrentUserData(me);
+      // 1. Concurrently fetch essential user/chat profile data to start chat instantly
+      await Promise.all([
+        api.get('/auth/me', token).then(me => setCurrentUserData(me)),
+        fetchRecentConversations()
+      ]);
 
-      // Recommendations & Leaderboards
-      const friendRecs = await api.get('/social/recommendations', token);
-      setFriendRecommendations(friendRecs);
-
-      const groupRecs = await api.get('/social/recommendations/groups', token);
-      setGroupRecommendations(groupRecs);
-
-      const influencers = await api.get('/social/influence', token);
-      setInfluenceRankings(influencers);
-
-      // Follow lists
-      const reqs = await api.get('/social/requests', token);
-      setFollowRequests(reqs);
-
-      const fers = await api.get('/social/followers', token);
-      setFollowers(fers);
-
-      const fing = await api.get('/social/following', token);
-      setFollowing(fing);
-
-      // Center Feed content
-      const networkProducts = await api.get('/social/recommendations/products', token);
-      setSharedProducts(networkProducts);
-
-      // Fetch active conversations list
-      fetchRecentConversations();
+      // 2. Concurrently load secondary/deeper social elements in a non-blocking way
+      Promise.all([
+        api.get('/social/recommendations', token),
+        api.get('/social/recommendations/groups', token),
+        api.get('/social/influence', token),
+        api.get('/social/requests', token),
+        api.get('/social/followers', token),
+        api.get('/social/following', token),
+        api.get('/social/recommendations/products', token)
+      ]).then(([friendRecs, groupRecs, influencers, reqs, fers, fing, networkProducts]) => {
+        setFriendRecommendations(friendRecs);
+        setGroupRecommendations(groupRecs);
+        setInfluenceRankings(influencers);
+        setFollowRequests(reqs);
+        setFollowers(fers);
+        setFollowing(fing);
+        setSharedProducts(networkProducts);
+      }).catch(err => {
+        console.error('Error loading deferred social panels data:', err);
+      });
     } catch (err) {
-      console.error('Error loading social data:', err);
+      console.error('Error loading initial social data:', err);
     }
   };
 
   const fetchRecentConversations = async () => {
     try {
-      const dmConvs = await api.get('/social/chat/conversations', token);
-      
-      let groupConvs = [];
-      try {
-        groupConvs = await api.get('/social/groups/joined', token);
-      } catch (err) {
-        console.warn('Failed to fetch joined groups:', err);
-      }
+      const [dmConvsResult, groupConvsResult] = await Promise.all([
+        api.get('/social/chat/conversations', token).catch(err => {
+          console.warn('Failed to fetch DM conversations:', err);
+          return [];
+        }),
+        api.get('/social/groups/joined', token).catch(err => {
+          console.warn('Failed to fetch joined groups:', err);
+          return [];
+        })
+      ]);
+      const dmConvs = Array.isArray(dmConvsResult) ? dmConvsResult : [];
+      const groupConvs = Array.isArray(groupConvsResult) ? groupConvsResult : [];
 
       // Map DMs
-      const mappedDMs = dmConvs.map(c => ({
-        type: 'dm',
-        id: c.user._id,
-        name: c.user.full_name,
-        user: c.user,
-        lastMessage: c.lastMessage,
-        updatedAt: c.lastMessage?.createdAt || c.user.createdAt || new Date(0)
-      }));
+      const mappedDMs = dmConvs
+        .filter(c => c.user?._id)
+        .map(c => ({
+          type: 'dm',
+          id: c.user._id,
+          name: c.user.full_name || c.user.username || 'User',
+          user: c.user,
+          lastMessage: c.lastMessage,
+          updatedAt: c.lastMessage?.createdAt || c.user.createdAt || new Date(0)
+        }));
 
       // Map Groups
       const mappedGroups = groupConvs.map(g => ({
@@ -346,19 +395,37 @@ const Social = () => {
   // Group creation
   const handleCreateGroup = async (e) => {
     e.preventDefault();
-    if (!newGroupName.trim()) return;
+    if (!newGroupName.trim() || isSubmittingGroup) return;
+
+    setIsSubmittingGroup(true);
     try {
       const res = await api.post('/social/groups', {
-        name: newGroupName,
-        description: newGroupDesc
+        name: newGroupName.trim(),
+        description: newGroupDesc.trim()
       }, token);
       addToast(res.message, 'success');
       setIsCreatingGroup(false);
       setNewGroupName('');
       setNewGroupDesc('');
-      loadAllSocialData();
+      await fetchRecentConversations();
     } catch (err) {
       addToast(err.message || 'Failed to create group', 'danger');
+    } finally {
+      setIsSubmittingGroup(false);
+    }
+  };
+
+  const handleDeleteGroup = async (groupId) => {
+    try {
+      const res = await api.delete(`/social/groups/${groupId}`, token);
+      addToast(res.message, 'success');
+      if (activeChat?.type === 'group' && activeChat.id === groupId) {
+        setActiveChat(null);
+        setChatMessages([]);
+      }
+      await fetchRecentConversations();
+    } catch (err) {
+      addToast(err.message || 'Failed to delete group', 'danger');
     }
   };
 
@@ -376,23 +443,45 @@ const Social = () => {
   // Open Chat Room
   const selectChat = async (target, type) => {
     setMobileChatView('chat');
-    setActiveChat({
-      id: target._id,
+    const chatId = target._id;
+    const chat = {
+      id: chatId,
       name: target.name || target.full_name,
       type,
       profile_pic: target.profile_pic || null
+    };
+
+    upsertConversation({
+      type,
+      id: chatId,
+      name: chat.name || (type === 'group' ? 'Group' : 'User'),
+      user: type === 'dm' ? target : undefined,
+      group: type === 'group' ? target : undefined,
+      lastMessage: null,
+      updatedAt: new Date()
     });
+
+    setActiveChat(chat);
+    activeChatRef.current = chat;
     setChatMessages([]);
     setIsStreamActive(false);
 
     // Load chat history directly from MongoDB via our API
     try {
+      let history = [];
       if (type === 'dm') {
-        const history = await api.get(`/social/chat/messages/${target._id}`, token);
-        setChatMessages(Array.isArray(history) ? history : []);
+        history = await api.get(`/social/chat/messages/${chatId}`, token);
       } else {
-        const history = await api.get(`/social/chat/group-messages/${target._id}`, token);
-        setChatMessages(Array.isArray(history) ? history : []);
+        history = await api.get(`/social/chat/group-messages/${chatId}`, token);
+      }
+      
+      // Ensure we only set messages if target is still the active chat
+      if (activeChatRef.current && activeChatRef.current.id === chatId) {
+        setChatMessages(prev => {
+          const existingIds = new Set(history.map(m => m._id));
+          const liveMessages = prev.filter(m => !existingIds.has(m._id));
+          return [...history, ...liveMessages];
+        });
       }
       setTimeout(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -457,7 +546,7 @@ const Social = () => {
   const handleCloneCart = async (cartItems) => {
     try {
       for (const item of cartItems) {
-        await api.post(`/cart/add/${item.product._id}`, { quantity: item.quantity }, token);
+        await api.post('/cart/add', { item_id: item.product._id, quantity: item.quantity }, token);
       }
       addToast('Cart cloned successfully!', 'success');
       refreshCart();
@@ -1634,10 +1723,14 @@ const Social = () => {
                             {wi.item?.price && <div className="pm-wl-price">₹{wi.item.price}</div>}
                           </div>
                           <button
-                            onClick={() => {
-                              api.post(`/cart/add/${wi.item._id}`, { quantity: 1 }, token);
-                              addToast('Added to cart!', 'success');
-                              refreshCart();
+                            onClick={async () => {
+                              try {
+                                await api.post('/cart/add', { item_id: wi.item._id, quantity: 1 }, token);
+                                addToast('Added to cart!', 'success');
+                                refreshCart();
+                              } catch (err) {
+                                addToast(err.message || 'Failed to add item to cart', 'danger');
+                              }
                             }}
                             style={{ background: '#1aad52', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
                           >
@@ -1723,7 +1816,11 @@ const Social = () => {
             </div>
             <div className="chat-fs-list">
               {conversations
-                .filter(c => c.name?.toLowerCase().includes(chatSearchQuery.toLowerCase()))
+                .filter(c => {
+                  const q = chatSearchQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  return (c.name || '').toLowerCase().includes(q);
+                })
                 .map((chat) => {
                   const isActive = activeChat.id === chat.id && activeChat.type === chat.type;
                   const isGroup = chat.type === 'group';
@@ -1811,16 +1908,21 @@ const Social = () => {
                       <div key={cItem._id} className="product-card-mini" onClick={() => {
                         handleSendMessage(null, {
                           type: 'CART',
-                          payload: { cartItems: [cItem] }
+                          payload: {
+                            cartItems: [{
+                              product: cItem.item?._id,
+                              quantity: cItem.quantity
+                            }]
+                          }
                         });
                         addToast('Product shared!', 'success');
                       }}>
                         <div className="product-thumb">
-                          {cItem.product?.image ? <img src={cItem.product.image} alt={cItem.product.name} /> : '🛒'}
+                          {cItem.item?.user_file ? <img src={cItem.item.user_file} alt={cItem.item.name} /> : '🛒'}
                         </div>
                         <div className="product-info">
-                          <div className="product-name truncate" style={{ maxWidth: '100px' }}>{cItem.product?.name}</div>
-                          <div className="product-price">₹{cItem.product?.price}</div>
+                          <div className="product-name truncate" style={{ maxWidth: '100px' }}>{cItem.item?.name}</div>
+                          <div className="product-price">₹{cItem.item?.price}</div>
                         </div>
                         <button className="product-share-btn">Share</button>
                       </div>
@@ -1906,10 +2008,14 @@ const Social = () => {
                                   <div className="prod-share-name">{msg.metadata.productId.name}</div>
                                   <div className="prod-share-price">₹{msg.metadata.productId.price}</div>
                                   <button
-                                    onClick={() => {
-                                      api.post(`/cart/add/${msg.metadata.productId._id}`, { quantity: 1 }, token);
-                                      addToast('Added to cart!', 'success');
-                                      refreshCart();
+                                    onClick={async () => {
+                                      try {
+                                        await api.post('/cart/add', { item_id: msg.metadata.productId._id, quantity: 1 }, token);
+                                        addToast('Added to cart!', 'success');
+                                        refreshCart();
+                                      } catch (err) {
+                                        addToast(err.message || 'Failed to add item to cart', 'danger');
+                                      }
                                     }}
                                     className="product-share-btn"
                                     style={{ width: '100%', marginTop: 8 }}
@@ -2215,38 +2321,77 @@ const Social = () => {
                   />
                   <div className="flex justify-end gap-2 text-[10px]">
                     <button type="button" onClick={() => setIsCreatingGroup(false)} className="px-2 py-1 bg-zinc-800 text-white rounded">Cancel</button>
-                    <button type="submit" className="px-2 py-1 bg-[#1aad52] text-white font-bold rounded">Create</button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingGroup}
+                      className="px-2 py-1 bg-[#1aad52] text-white font-bold rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSubmittingGroup ? 'Creating...' : 'Create'}
+                    </button>
                   </div>
                 </form>
               )}
               
               <div className="space-y-1 max-h-[220px] overflow-y-auto">
-                {recentChatsList.map((chat, idx) => (
-                  <div 
-                    key={idx}
-                    onClick={() => selectChat(chat.user, 'dm')}
-                    className={`chat-item ${activeChat && activeChat.id === chat.user._id ? 'bg-[#1aad52]/10' : ''}`}
-                  >
-                    <div
-                      className="relative flex-shrink-0"
-                      onClick={e => { e.stopPropagation(); openProfile(chat.user._id); }}
-                      title="View profile"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className="avatar sm">
-                        <img src={getUserAvatarUrl(chat.user)} alt={chat.user.full_name} />
-                      </div>
-                      {onlineStatusMap[chat.user._id] && <div className="online-dot"></div>}
-                    </div>
-                    <div className="chat-info">
-                      <div className="chat-name">{chat.user.full_name}</div>
-                      <div className="chat-preview">{chat.lastMessage?.content}</div>
-                    </div>
-                    <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>now</div>
-                  </div>
-                ))}
+                {conversations.map((chat) => {
+                  const isGroup = chat.type === 'group';
+                  const isActive = activeChat && activeChat.id === chat.id && activeChat.type === chat.type;
+                  const creatorId = chat.group?.creator?._id || chat.group?.creator;
+                  const currentId = currentUserData?._id || currentUserData?.id;
+                  const canDeleteGroup = isGroup && creatorId && currentId && creatorId.toString() === currentId.toString();
 
-                {recentChatsList.length === 0 && (
+                  return (
+                    <div
+                      key={`${chat.type}-${chat.id}`}
+                      onClick={() => selectChat(isGroup ? chat.group : chat.user, chat.type)}
+                      className={`chat-item ${isActive ? 'bg-[#1aad52]/10' : ''}`}
+                    >
+                      <div
+                        className="relative flex-shrink-0"
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (!isGroup) openProfile(chat.user._id);
+                        }}
+                        title={isGroup ? 'Group chat' : 'View profile'}
+                        style={{ cursor: isGroup ? 'default' : 'pointer' }}
+                      >
+                        <div className="avatar sm">
+                          {isGroup ? (
+                            <Users size={14} />
+                          ) : (
+                            <img src={getUserAvatarUrl(chat.user)} alt={chat.user.full_name} />
+                          )}
+                        </div>
+                        {!isGroup && onlineStatusMap[chat.user._id] && <div className="online-dot"></div>}
+                      </div>
+                      <div className="chat-info">
+                        <div className="chat-name">{chat.name}</div>
+                        <div className="chat-preview">
+                          {chat.lastMessage?.content || (isGroup ? 'Group created' : 'Start a conversation')}
+                        </div>
+                      </div>
+                      {canDeleteGroup ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteGroup(chat.id);
+                          }}
+                          className="px-2 py-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded text-[10px] font-bold"
+                          title="Delete group"
+                        >
+                          Delete
+                        </button>
+                      ) : (
+                        <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>
+                          {chat.lastMessage ? new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {conversations.length === 0 && (
                   <p className="text-[10px] text-gray-500 text-center py-4">No active chats.</p>
                 )}
               </div>
@@ -2323,10 +2468,14 @@ const Social = () => {
                       <div className="product-footer">
                         <div className="product-price">₹{prod.price}</div>
                         <button 
-                          onClick={() => {
-                            api.post(`/cart/add/${prod._id}`, { quantity: 1 }, token);
-                            addToast('Item added to cart!', 'success');
-                            refreshCart();
+                          onClick={async () => {
+                            try {
+                              await api.post('/cart/add', { item_id: prod._id, quantity: 1 }, token);
+                              addToast('Item added to cart!', 'success');
+                              refreshCart();
+                            } catch (err) {
+                              addToast(err.message || 'Failed to add item', 'danger');
+                            }
                           }}
                           className="add-btn"
                         >
