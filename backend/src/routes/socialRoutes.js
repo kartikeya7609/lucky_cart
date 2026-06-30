@@ -23,6 +23,7 @@ import {
   getChatMessages,
   getGroupChatMessages,
   getChatConversations,
+  sendChatMessage,
   getFollowers,
   getFollowing,
   getJoinedGroups
@@ -63,5 +64,6 @@ router.get('/influence', protect, getInfluencePageRankEndpoint);
 router.get('/chat/conversations', protect, getChatConversations);
 router.get('/chat/messages/:userId', protect, getChatMessages);
 router.get('/chat/group-messages/:groupId', protect, getGroupChatMessages);
+router.post('/chat/messages', protect, sendChatMessage);
 
 export default router;

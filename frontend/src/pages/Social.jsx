@@ -27,6 +27,8 @@ const Social = () => {
   const [activeTab, setActiveTab] = useState('feed'); // 'feed', 'wishlists', 'carts'
   const [activeChat, setActiveChat] = useState(null); // { id, name, type: 'dm' | 'group' }
   const [chatMessages, setChatMessages] = useState([]);
+  const [loadingChatId, setLoadingChatId] = useState(null);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [onlineStatusMap, setOnlineStatusMap] = useState({});
   const [replyTo, setReplyTo] = useState(null);
@@ -76,6 +78,32 @@ const Social = () => {
   const [mobileChatView, setMobileChatView] = useState('chat'); // 'chat' | 'list'
 
   const chatEndRef = useRef(null);
+  const chatMessagesRef = useRef(null);
+  const messageCacheRef = useRef(new Map());
+
+  const mergeMessages = (existingMessages, nextMessages) => {
+    const byId = new Map();
+    [...existingMessages, ...nextMessages].forEach(message => {
+      if (message?._id) {
+        byId.set(message._id, message);
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  };
+
+  const appendChatMessage = (message) => {
+    if (!message?._id) return;
+    setChatMessages(prev => mergeMessages(prev, [message]));
+  };
+
+  const scrollMessagesToBottom = () => {
+    requestAnimationFrame(() => {
+      const el = chatMessagesRef.current;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+  };
 
   const upsertConversation = (conversation) => {
     setConversations(prev => {
@@ -96,6 +124,14 @@ const Social = () => {
   useEffect(() => {
     currentUserDataRef.current = currentUserData;
   }, [currentUserData]);
+
+  useEffect(() => {
+    if (activeChat && chatMessages.length > 0) {
+      const cacheKey = `${activeChat.type}:${activeChat.id}`;
+      messageCacheRef.current.set(cacheKey, chatMessages);
+      scrollMessagesToBottom();
+    }
+  }, [activeChat, chatMessages]);
 
   // Auto-join all socket rooms for joined groups when conversations list is updated
   useEffect(() => {
@@ -127,7 +163,7 @@ const Social = () => {
       const chat = activeChatRef.current;
       if (chat && chat.type === 'dm' && 
           (msg.sender._id === chat.id || msg.recipient?._id === chat.id)) {
-        setChatMessages(prev => [...prev, msg]);
+        appendChatMessage(msg);
       } else {
         const senderId = msg.sender?._id || msg.sender;
         const currentUserId = currentUserDataRef.current?.id || currentUserDataRef.current?._id;
@@ -142,7 +178,7 @@ const Social = () => {
     socket.on('receive_group_msg', (data) => {
       const chat = activeChatRef.current;
       if (chat && chat.type === 'group' && data.groupId === chat.id) {
-        setChatMessages(prev => [...prev, data.message]);
+        appendChatMessage(data.message);
       } else {
         const senderId = data.message.sender?._id || data.message.sender;
         const currentUserId = currentUserDataRef.current?.id || currentUserDataRef.current?._id;
@@ -444,6 +480,7 @@ const Social = () => {
   const selectChat = async (target, type) => {
     setMobileChatView('chat');
     const chatId = target._id;
+    const cacheKey = `${type}:${chatId}`;
     const chat = {
       id: chatId,
       name: target.name || target.full_name,
@@ -463,7 +500,8 @@ const Social = () => {
 
     setActiveChat(chat);
     activeChatRef.current = chat;
-    setChatMessages([]);
+    setLoadingChatId(chatId);
+    setChatMessages(messageCacheRef.current.get(cacheKey) || []);
     setIsStreamActive(false);
 
     // Load chat history directly from MongoDB via our API
@@ -477,47 +515,93 @@ const Social = () => {
       
       // Ensure we only set messages if target is still the active chat
       if (activeChatRef.current && activeChatRef.current.id === chatId) {
-        setChatMessages(prev => {
-          const existingIds = new Set(history.map(m => m._id));
-          const liveMessages = prev.filter(m => !existingIds.has(m._id));
-          return [...history, ...liveMessages];
-        });
+        messageCacheRef.current.set(cacheKey, history);
+        setChatMessages(prev => mergeMessages(history, prev));
       }
-      setTimeout(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
-      }, 100);
     } catch (err) {
       console.error('Failed to load chat history:', err);
+      addToast(err.message || 'Failed to load chat history', 'danger');
+    } finally {
+      if (activeChatRef.current && activeChatRef.current.id === chatId) {
+        setLoadingChatId(null);
+      }
     }
   };
 
   // Send Message
-  const handleSendMessage = (e, metadata = null) => {
+  const sendMessageOverSocket = (eventName, payload) => new Promise((resolve, reject) => {
+    const socket = socketRef.current;
+    if (!socket?.connected) {
+      reject(new Error('Socket is disconnected'));
+      return;
+    }
+
+    socket.timeout(5000).emit(eventName, payload, (err, response) => {
+      if (err) {
+        reject(new Error('Message send timed out'));
+        return;
+      }
+      if (response?.ok === false) {
+        reject(new Error(response.message || 'Failed to send message'));
+        return;
+      }
+      resolve(response?.message || null);
+    });
+  });
+
+  const sendMessageOverHttp = async (chat, payload) => {
+    return api.post('/social/chat/messages', {
+      chatId: chat.id,
+      type: chat.type,
+      content: payload.content,
+      messageType: payload.messageType,
+      metadata: payload.metadata,
+      replyTo: payload.replyTo
+    }, token);
+  };
+
+  const handleSendMessage = async (e, metadata = null) => {
     if (e) e.preventDefault();
-    if (!chatInput.trim() && !metadata) return;
+    if ((!chatInput.trim() && !metadata) || !activeChat || isSendingMessage) return;
 
-    if (socketRef.current && activeChat) {
-      const payload = {
-        content: chatInput || (metadata ? `Shared content` : ''),
-        messageType: metadata ? metadata.type : 'TEXT',
-        metadata: metadata ? metadata.payload : null,
-        replyTo: replyTo ? replyTo._id : null
-      };
+    const chat = activeChat;
+    const payload = {
+      content: (chatInput || (metadata ? 'Shared content' : '')).trim(),
+      messageType: metadata ? metadata.type : 'TEXT',
+      metadata: metadata ? metadata.payload : null,
+      replyTo: replyTo ? replyTo._id : null
+    };
 
-      if (activeChat.type === 'dm') {
-        socketRef.current.emit('send_dm', {
-          recipientId: activeChat.id,
+    setIsSendingMessage(true);
+    setChatInput('');
+    setReplyTo(null);
+
+    try {
+      let sentMessage = null;
+      if (chat.type === 'dm') {
+        sentMessage = await sendMessageOverSocket('send_dm', {
+          recipientId: chat.id,
           ...payload
         });
       } else {
-        socketRef.current.emit('send_group_msg', {
-          groupId: activeChat.id,
+        sentMessage = await sendMessageOverSocket('send_group_msg', {
+          groupId: chat.id,
           ...payload
         });
       }
-      setChatInput('');
-      setReplyTo(null);
-      socketRef.current.emit('typing_stop', { targetId: activeChat.id, isGroup: activeChat.type === 'group' });
+      if (sentMessage) appendChatMessage(sentMessage);
+    } catch (socketErr) {
+      try {
+        const sentMessage = await sendMessageOverHttp(chat, payload);
+        appendChatMessage(sentMessage);
+      } catch (httpErr) {
+        setChatInput(payload.messageType === 'TEXT' ? payload.content : chatInput);
+        setReplyTo(replyTo);
+        addToast(httpErr.message || socketErr.message || 'Failed to send message', 'danger');
+      }
+    } finally {
+      setIsSendingMessage(false);
+      socketRef.current?.emit('typing_stop', { targetId: chat.id, isGroup: chat.type === 'group' });
     }
   };
 
@@ -996,6 +1080,7 @@ const Social = () => {
           flex-direction: column;
           background: var(--bg);
           min-width: 0;
+          min-height: 0;
         }
 
         .chat-fs-header {
@@ -1080,6 +1165,7 @@ const Social = () => {
         /* ── Messages Area ── */
         .chat-fs-messages {
           flex: 1;
+          min-height: 0;
           overflow-y: auto;
           padding: 16px 18px;
           display: flex;
@@ -1087,6 +1173,12 @@ const Social = () => {
           gap: 2px;
           scroll-behavior: auto;
           background: var(--bg);
+        }
+
+        .chat-loading-state {
+          margin: auto;
+          color: var(--text3);
+          font-size: 12px;
         }
 
         .chat-fs-messages::-webkit-scrollbar { width: 4px; }
@@ -1419,6 +1511,11 @@ const Social = () => {
 
         .send-btn:hover { background: var(--green-dark); }
         .send-btn:active { transform: scale(0.92); }
+        .send-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+          transform: none;
+        }
 
         /* ── Emoji picker ── */
         .emoji-picker {
@@ -2000,7 +2097,10 @@ const Social = () => {
             )}
 
             {/* Messages Area */}
-            <div className="chat-fs-messages">
+            <div className="chat-fs-messages" ref={chatMessagesRef}>
+              {loadingChatId === activeChat.id && chatMessages.length === 0 && (
+                <div className="chat-loading-state">Loading messages...</div>
+              )}
               {chatMessages.map((msg, index) => {
                 const msgSenderId = msg.sender?.id || msg.sender?._id || msg.sender;
                 const currentUserId = currentUserData?.id || currentUserData?._id || currentUserData;
@@ -2222,7 +2322,8 @@ const Social = () => {
                 />
 
                 <div className="input-actions">
-                  <button type="submit" className="send-btn" aria-label="Send">
+                  <button type="submit" className="send-btn" aria-label="Send" disabled={isSendingMessage || !chatInput.trim()}>
+                    <Send size={16} />
                   </button>
                 </div>
               </form>

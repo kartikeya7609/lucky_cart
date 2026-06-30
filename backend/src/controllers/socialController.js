@@ -1,4 +1,4 @@
-import { User, Follow, Wishlist } from '../models/index.js';
+import { User, Follow, Wishlist, Message, Group, Notification } from '../models/index.js';
 import { findConnectionPath, getFriendRecommendations } from '../utils/socialGraph.js';
 import { StreamChat } from 'stream-chat';
 
@@ -679,6 +679,82 @@ export const getGroupChatMessages = async (req, res) => {
 
     messages.reverse();
     res.status(200).json(messages);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const populateMessageForChat = (messageId) => Message.findById(messageId)
+  .populate('sender', 'username full_name profile_pic')
+  .populate('recipient', 'username full_name profile_pic')
+  .populate('group', 'name')
+  .populate('metadata.productId', 'name price user_file description')
+  .populate('metadata.cartItems.product', 'name price user_file description')
+  .populate({
+    path: 'replyTo',
+    populate: { path: 'sender', select: 'username full_name' }
+  });
+
+// Send message over HTTP as a reliable fallback for dropped socket sends.
+export const sendChatMessage = async (req, res) => {
+  try {
+    const {
+      chatId,
+      type,
+      content,
+      messageType = 'TEXT',
+      metadata = null,
+      replyTo = null
+    } = req.body;
+
+    const trimmedContent = typeof content === 'string' ? content.trim() : '';
+    if (!chatId || !['dm', 'group'].includes(type) || !trimmedContent) {
+      return res.status(400).json({ message: 'Missing chat target or message content.' });
+    }
+
+    const messageData = {
+      sender: req.user._id,
+      message_type: messageType,
+      content: trimmedContent,
+      metadata,
+      replyTo: replyTo || null
+    };
+
+    if (type === 'dm') {
+      const recipient = await User.findById(chatId).select('_id');
+      if (!recipient) {
+        return res.status(404).json({ message: 'Recipient not found.' });
+      }
+      messageData.recipient = chatId;
+    } else {
+      const group = await Group.findOne({ _id: chatId, members: req.user._id }).select('_id name members');
+      if (!group) {
+        return res.status(403).json({ message: 'You are not a member of this group.' });
+      }
+      messageData.group = chatId;
+    }
+
+    const message = await Message.create(messageData);
+    const populatedMessage = await populateMessageForChat(message._id);
+
+    const io = req.app.get('io');
+    if (io) {
+      if (type === 'dm') {
+        io.to(chatId.toString()).to(req.user._id.toString()).emit('receive_dm', populatedMessage);
+      } else {
+        io.to(`group_${chatId}`).emit('receive_group_msg', { groupId: chatId, message: populatedMessage });
+      }
+    }
+
+    if (type === 'dm') {
+      const senderName = req.user.full_name || req.user.username;
+      await new Notification({
+        user: chatId,
+        message: `New message from ${senderName}: "${trimmedContent.length > 50 ? trimmedContent.slice(0, 50) + '...' : trimmedContent}"`
+      }).save().catch(err => console.error('Error saving fallback DM notification:', err));
+    }
+
+    res.status(201).json(populatedMessage);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

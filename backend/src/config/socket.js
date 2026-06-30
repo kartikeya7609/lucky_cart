@@ -69,10 +69,13 @@ export const setupSocket = (server, allowedOrigins) => {
     });
 
     // Direct Message Handler
-    socket.on('send_dm', async (data) => {
+    socket.on('send_dm', async (data, ack) => {
       try {
         const { recipientId, content, messageType, metadata, replyTo } = data;
-        if (!recipientId || !content) return;
+        if (!recipientId || !content?.trim()) {
+          ack?.({ ok: false, message: 'Missing recipient or message content.' });
+          return;
+        }
 
         // Check if recipient is online and has this sender's chat active
         const recipientSocketId = onlineUsers.get(recipientId);
@@ -105,6 +108,7 @@ export const setupSocket = (server, allowedOrigins) => {
 
         // Emit to recipient and sender (all active tabs)
         io.to(recipientId).to(userId).emit('receive_dm', populatedMessage);
+        ack?.({ ok: true, message: populatedMessage });
 
         if (!isRead) {
           const senderName = socket.user.full_name || socket.user.username;
@@ -114,15 +118,25 @@ export const setupSocket = (server, allowedOrigins) => {
           }).save().catch(err => console.error("Error saving DM Notification:", err));
         }
       } catch (err) {
+        ack?.({ ok: false, message: err.message });
         socket.emit('error_message', { message: err.message });
       }
     });
 
     // Group Message Handler
-    socket.on('send_group_msg', async (data) => {
+    socket.on('send_group_msg', async (data, ack) => {
       try {
         const { groupId, content, messageType, metadata, replyTo } = data;
-        if (!groupId || !content) return;
+        if (!groupId || !content?.trim()) {
+          ack?.({ ok: false, message: 'Missing group or message content.' });
+          return;
+        }
+
+        const groupObj = await Group.findOne({ _id: groupId, members: socket.user._id });
+        if (!groupObj) {
+          ack?.({ ok: false, message: 'You are not a member of this group.' });
+          return;
+        }
 
         const message = await Message.create({
           sender: socket.user._id,
@@ -144,9 +158,9 @@ export const setupSocket = (server, allowedOrigins) => {
 
         // Emit to group room
         io.to(`group_${groupId}`).emit('receive_group_msg', { groupId, message: populatedMessage });
+        ack?.({ ok: true, message: populatedMessage });
 
         // Save DB notifications for inactive members
-        const groupObj = await Group.findById(groupId);
         if (groupObj) {
           const senderName = socket.user.full_name || socket.user.username;
           for (const memberId of groupObj.members) {

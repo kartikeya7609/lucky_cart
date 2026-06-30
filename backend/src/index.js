@@ -114,7 +114,8 @@ app.use((err, req, res, next) => {
 });
 
 // Setup socket connections
-setupSocket(server, allowedOrigins);
+const io = setupSocket(server, allowedOrigins);
+app.set('io', io);
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
